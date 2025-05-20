@@ -1,31 +1,12 @@
 from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
-
 from selenium_options import custom_options
-
-
-def get_driver_path():
-    return "/home/brian/chrome-driver/chrome-linux64/chrome"
-
-
-def wait_for_list_page_load(driver):
-    # Step 1: Wait for full page load (HTML + JS-ready)
-    WebDriverWait(driver, 15).until(
-        lambda d: d.execute_script("return document.readyState") == "complete"
-    )
-
-    # Step 2: Wait for a key Amazon element (e.g., search result block)
-    WebDriverWait(driver, 15).until(
-        EC.presence_of_element_located((By.CSS_SELECTOR, "div.s-main-slot"))
-    )
+from selenium_behavior import wait_for_list_page_load
 
 
 def get_next_page_url(html):
     """
-    
+        Return the next page in a product list
     """
     soup = BeautifulSoup(html, "html.parser")
     pagination_strip = soup.find("span", class_="s-pagination-strip")
@@ -40,6 +21,9 @@ def get_next_page_url(html):
 
 
 def what_type_of_list(soup):
+    """
+        Determine what type of list the product list page is (currently identified 2 types - Grid and row)
+    """
     list_items = soup.find_all("div", attrs={"role": "listitem"})
     li = list_items[0]
 
@@ -50,10 +34,13 @@ def what_type_of_list(soup):
 
 
 def scrape_rows(soup):
+    """
+        Scrape row list page
+    """
     list_items = soup.find_all("div", attrs={"role": "listitem"})
 
     links = []
-    c = 0
+
     for div in list_items:
         card_container = div.find("div", class_="puis-card-container")
         if div.find("span", string="sponsored") is not None:
@@ -73,6 +60,9 @@ def scrape_rows(soup):
 
 
 def scrape_grid(soup):
+    """
+        Scrape grid list page
+    """
     list_items = soup.find_all("div", attrs={"role": "listitem"})
 
     links = []
@@ -120,22 +110,18 @@ def get_product_urls(list_url):
     total_urls = scrape_list_page(html)
     next_page_url = get_next_page_url(html)
     current_page = 1
-    print("Current page: ", current_page)
 
     while next_page_url is not None:
-        # Get page source
         current_page += 1
         driver.get(next_page_url)
         wait_for_list_page_load(driver)    
         html = driver.page_source
         total_urls.extend(scrape_list_page(html))
         next_page_url = get_next_page_url(html)
-        print("Current page: ", current_page)
 
-    
-    #driver.exit()
+    driver.quit()
     return total_urls
-
+ 
 
 if __name__ == "__main__":
     list_of_product_urls = get_product_urls("https://www.amazon.com/s?k=Shoes&rh=p_36%3A-5000&_encoding=UTF8")
