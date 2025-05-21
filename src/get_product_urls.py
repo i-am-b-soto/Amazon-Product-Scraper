@@ -2,6 +2,7 @@ from selenium import webdriver
 from bs4 import BeautifulSoup
 from selenium_options import custom_options
 from selenium_behavior import wait_for_list_page_load
+from project_globals import FIRST_LIST_PAGE_LOADED
 
 
 def get_next_page_url(html):
@@ -98,19 +99,20 @@ def scrape_list_page(html):
     return urls_on_page
 
 
-def get_product_urls(list_url):
+def get_product_urls(list_url, driver):
     """
         Given a list of items, either from a search result or category, return a list of all dem urls
     """
-    driver = webdriver.Chrome(options=custom_options())
 
     driver.get(list_url)
     wait_for_list_page_load(driver)
+    
     html = driver.page_source
     total_urls = scrape_list_page(html)
+    FIRST_LIST_PAGE_LOADED.set()
     next_page_url = get_next_page_url(html)
     current_page = 1
-
+    
     while next_page_url is not None:
         current_page += 1
         driver.get(next_page_url)
@@ -119,7 +121,8 @@ def get_product_urls(list_url):
         total_urls.extend(scrape_list_page(html))
         next_page_url = get_next_page_url(html)
 
-    driver.quit()
+        yield total_urls
+
     return total_urls
  
 

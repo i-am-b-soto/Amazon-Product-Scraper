@@ -1,7 +1,5 @@
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+
+
 from bs4 import BeautifulSoup
 from AmazonProduct import AmazonProduct
 
@@ -92,11 +90,10 @@ def scrape_product(html, product_url):
     # Todo: Other types of product pages
 
 
-def get_product(product_url):
+def get_product(product_url, driver):
     """
         Given a list of items, either from a search result or category, return a list of all dem urls
     """
-    driver = webdriver.Chrome(options=custom_options())
 
     driver.get(product_url)
     wait_for_product_page_load(driver)
@@ -104,7 +101,6 @@ def get_product(product_url):
     
     p = scrape_product(html, product_url)
 
-    driver.quit()
     return p
 
 

@@ -9,46 +9,7 @@ https://docs.apify.com/sdk/python
 from __future__ import annotations
 
 from apify import Actor
-from bs4 import BeautifulSoup
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-import time
-from httpx import AsyncClient
-
-
-
-class AmazonProduct:
-    _title = None
-    _price = None
-
-    def __init__(self, title, price):
-        self._title = title
-        self._price = price
-
-    def to_json_(self):
-        return {"title": self._title, "price": self._price}
-
-
-def selenium_options():
-    options = Options()
-    options.add_argument("--disable-gpu")  # Safe in most headless environments
-    options.add_argument("--window-size=1880,1440")  # Explicit viewport size
-    options.add_argument("--no-sandbox")  # Required by some container environments
-    options.add_argument("--disable-dev-shm-usage")  # Prevents crashes in containers
-    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36")
-
-
-def scrape_product(url):
-    driver = webdriver.Chrome(options=selenium_options())
-
-    driver.get(url)
-
-    time.sleep(2)
-
-    # Get page source
-    html = driver.page_source
-
-    driver.exit()
+import thread_manager
 
 
 async def main() -> None:
@@ -65,7 +26,7 @@ async def main() -> None:
         if not url:
             raise ValueError('Missing "url" attribute in input!')
         
-        scraped_amazon_products = []
+        thread_manager.start(url)
 
-        for product in scraped_amazon_products:
+        for product in thread_manager.scraped_amazon_products():
             await Actor.push_data(product.to_json())
