@@ -15,6 +15,7 @@ from .project_globals import (NUM_CONSUMERS, FIRST_LIST_PAGE_LOADED,
 
 product_url_queue = queue.Queue()
 producers_done = threading.Event()
+product_end_marker = object()  # To signal completion
 
 products_processed = 0
 lock = threading.Lock()

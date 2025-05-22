@@ -43,9 +43,16 @@ def human_hover(driver):
     links = driver.find_elements(By.TAG_NAME, "a")
 
     # Optional: filter for visible & usable links
-    visible_links = [link for link in links if link.is_displayed() and link.get_attribute("href")]
+    visible_links = [link for link in links if link.is_displayed() and
+                     link.get_attribute("href")]
     selected = random.choice(visible_links)
     ActionChains(driver).move_to_element(selected).perform()
+
+
+def human_click(driver):
+    # Collect all clickable elements
+    clickables = driver.find_elements(By.XPATH, "//*[self::a or self::button or @onclick]")
+    pass
 
 
 def human_action(driver, num):

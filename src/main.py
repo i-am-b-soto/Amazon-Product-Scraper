@@ -7,8 +7,11 @@ https://docs.apify.com/sdk/python
 """
 
 from __future__ import annotations
+import threading
 
 from apify import Actor
+
+
 from . import thread_manager
 
 
@@ -27,7 +30,8 @@ async def main() -> None:
         if not url:
             raise ValueError('Missing "url" attribute in input!')
         
-        thread_manager.start(url)
+        t = threading.Thread(target=thread_manager.start, args=(url,))
+        t.start()
 
         for product in thread_manager.scraped_amazon_products():
             await Actor.push_data(product.to_json())
