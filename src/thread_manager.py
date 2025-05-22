@@ -1,13 +1,13 @@
 import threading
 import queue
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
+import time
 from selenium import webdriver
-from selenium.webdriver.support import expected_conditions as EC
-from get_product_urls import get_product_urls
-from get_product import get_product
-from selenium_options import custom_options
-from project_globals import NUM_CONSUMERS, FIRST_LIST_PAGE_LOADED, PRODUCT_QUEUE
+
+from .get_product_urls import get_product_urls
+from .get_product import get_product
+from .selenium_options import custom_options
+from .project_globals import (NUM_CONSUMERS, FIRST_LIST_PAGE_LOADED,
+                    PRODUCT_QUEUE)
 
 # Assuming these two functions are defined by you:
 # def get_product_urls(listing_url): -> returns list of URLs
@@ -15,6 +15,19 @@ from project_globals import NUM_CONSUMERS, FIRST_LIST_PAGE_LOADED, PRODUCT_QUEUE
 
 product_url_queue = queue.Queue()
 producers_done = threading.Event()
+
+products_processed = 0
+lock = threading.Lock()
+
+def increment():
+    global products_processed
+    with lock:
+        products_processed += 1
+
+
+def get_products_processed():
+    with lock:
+        return products_processed
 
 
 def scraped_amazon_products(timeout=2):
@@ -29,16 +42,17 @@ def scraped_amazon_products(timeout=2):
             if producers_done.is_set() and PRODUCT_QUEUE.empty():
                 break
 
+
 def producer(listing_url):
     """
     
     """
     driver = webdriver.Chrome(options=custom_options())
 
-    urls = get_product_urls(listing_url)
+    urls = get_product_urls(listing_url, driver)
     for url in urls:
         product_url_queue.put(url)
-    
+
     producers_done.set()
     
     # Signal to consumers that producer is done
@@ -49,6 +63,10 @@ def producer(listing_url):
 
 
 def consumer(thread_id):
+    """
+
+    """
+    print("Thread {} has started".format(thread_id))
     driver = webdriver.Chrome(options=custom_options())
 
     while True:
@@ -58,10 +76,14 @@ def consumer(thread_id):
             break
         try:
             product_data = get_product(url, driver)
-            PRODUCT_QUEUE.put(product_data)
+            if product_data:
+
+                PRODUCT_QUEUE.put(product_data)
+                increment()
+                print("{} products processed".format(get_products_processed()))
         except Exception as e:
             print(f"Error in Consumer-{thread_id} with URL {url}: {e}")
-
+             
     driver.quit()
 
 
@@ -80,15 +102,19 @@ def start(listing_url):
         t.start() 
         consumer_threads.append(t)
 
+    start_time = time.time()
+
     # Wait for producer to finish
     producer_thread.join()
 
     # Wait for all consumers to finish
     for t in consumer_threads:
         t.join()
+    
+    end_time = time.time()
 
-    print("All threads finished.")
-    print(f"Scraped {len(scraped_products)} products.")
+    print("All threads finished. Total time elapsed: {}"
+          .format(end_time - start_time))
 
 
 if __name__ == "__main__":

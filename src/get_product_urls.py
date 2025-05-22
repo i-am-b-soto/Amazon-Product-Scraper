@@ -1,8 +1,7 @@
-from selenium import webdriver
+import random
 from bs4 import BeautifulSoup
-from selenium_options import custom_options
-from selenium_behavior import wait_for_list_page_load
-from project_globals import FIRST_LIST_PAGE_LOADED
+from .selenium_behavior import wait_for_list_page_load, human_action
+from .project_globals import FIRST_LIST_PAGE_LOADED
 
 
 def get_next_page_url(html):
@@ -55,7 +54,7 @@ def scrape_rows(soup):
                 if link_string.startswith("/sspa"):
                     pass
                 else:
-                    links.append(link_string)
+                    links.append("https://www.amazon.com" + link_string)
     
     return links
 
@@ -80,7 +79,7 @@ def scrape_grid(soup):
                 if link_string.startswith("/sspa"):
                     pass
                 else:
-                    links.append(link_string)
+                    links.append("https://www.amazon.com" + link_string)
     
     return links  
 
@@ -104,8 +103,13 @@ def get_product_urls(list_url, driver):
         Given a list of items, either from a search result or category, return a list of all dem urls
     """
 
-    driver.get(list_url)
-    wait_for_list_page_load(driver)
+    try:
+        driver.get(list_url)
+        wait_for_list_page_load(driver)
+    except Exception as e:
+        print("There was an issue aquiriing the Amazon list url {}: {}"
+              .format(list_url, e))
+        raise StopIteration
     
     html = driver.page_source
     total_urls = scrape_list_page(html)
@@ -113,18 +117,29 @@ def get_product_urls(list_url, driver):
     next_page_url = get_next_page_url(html)
     current_page = 1
     
+    for url in total_urls:
+        yield url
+
     while next_page_url is not None:
         current_page += 1
-        driver.get(next_page_url)
-        wait_for_list_page_load(driver)    
+        
+        try:
+            driver.get(next_page_url)
+            wait_for_list_page_load(driver)
+        except Exception as e:
+            print("There was an issue aquiriing the Amazon list url{}: {}"
+                .format(next_page_url, e))
+            raise StopIteration
+
         html = driver.page_source
         total_urls.extend(scrape_list_page(html))
         next_page_url = get_next_page_url(html)
 
-        yield total_urls
+        human_action(driver, random.randint(0, 8))
 
-    return total_urls
- 
+        for url in total_urls:
+            yield url
+
 
 if __name__ == "__main__":
     list_of_product_urls = get_product_urls("https://www.amazon.com/s?k=Shoes&rh=p_36%3A-5000&_encoding=UTF8")

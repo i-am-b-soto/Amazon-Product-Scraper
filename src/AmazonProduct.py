@@ -4,7 +4,7 @@ class AmazonProduct:
     _description = None
     _url = None
 
-    def __init__(self, title, price, description=None, url=None):
+    def __init__(self, title="N/A", price="N/A", description=None, url=None):
         self._title = title
         self._price = price
         self._description = description

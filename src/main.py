@@ -9,7 +9,7 @@ https://docs.apify.com/sdk/python
 from __future__ import annotations
 
 from apify import Actor
-import thread_manager
+from . import thread_manager
 
 
 async def main() -> None:
@@ -21,8 +21,9 @@ async def main() -> None:
     """
     async with Actor:
         # Retrieve the input object for the Actor. The structure of input is defined in input_schema.json.
-        actor_input = await Actor.get_input() or {'url': 'https://apify.com/'}
+        actor_input = await Actor.get_input()
         url = actor_input.get('url')
+        print(url)
         if not url:
             raise ValueError('Missing "url" attribute in input!')
         

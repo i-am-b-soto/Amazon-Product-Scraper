@@ -1,10 +1,8 @@
-
-
+import random
 from bs4 import BeautifulSoup
-from AmazonProduct import AmazonProduct
 
-from selenium_options import custom_options
-from selenium_behavior import wait_for_product_page_load
+from .AmazonProduct import AmazonProduct
+from .selenium_behavior import wait_for_product_page_load, human_action
 
 
 def get_type_of_product_page(soup):
@@ -92,14 +90,22 @@ def scrape_product(html, product_url):
 
 def get_product(product_url, driver):
     """
-        Given a list of items, either from a search result or category, return a list of all dem urls
+        Given a list of items, either from a search result or category, return a representation of 
+            an Amazon product. Or None if the page couldn't be accessed
     """
 
-    driver.get(product_url)
-    wait_for_product_page_load(driver)
+    try:
+        driver.get(product_url)
+        wait_for_product_page_load(driver)
+    except Exception as e:
+        print("Couldn't fetch product at url: {}-{}".format(product_url, e))
+        return None
+
     html = driver.page_source
     
     p = scrape_product(html, product_url)
+
+    human_action(driver, random.randint(0, 8))
 
     return p
 
