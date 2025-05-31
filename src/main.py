@@ -35,3 +35,5 @@ async def main() -> None:
 
         for product in thread_manager.scraped_amazon_products():
             await Actor.push_data(product.to_json())
+
+

@@ -132,7 +132,7 @@ def get_product_urls(list_url, driver):
             raise StopIteration
 
         html = driver.page_source
-        total_urls.extend(scrape_list_page(html))
+        total_urls = scrape_list_page(html)
         next_page_url = get_next_page_url(html)
 
         human_action(driver, random.randint(0, 8))
@@ -142,7 +142,5 @@ def get_product_urls(list_url, driver):
 
 
 if __name__ == "__main__":
-    list_of_product_urls = get_product_urls("https://www.amazon.com/s?k=Shoes&rh=p_36%3A-5000&_encoding=UTF8")
-
-    #print(list_of_product_urls)
+    pass
     

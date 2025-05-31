@@ -13,6 +13,9 @@ def get_type_of_product_page(soup):
 
 
 def get_price_regular(soup):
+    """
+    
+    """
     whole_number = "00"
     decimal_number = "00"
 
