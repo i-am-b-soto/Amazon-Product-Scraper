@@ -4,6 +4,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.common.keys import Keys
 
 
 def wait_for_list_page_load(driver):
@@ -29,31 +30,51 @@ def human_sleep(a=0.5, b=2.5):
     time.sleep(random.uniform(a, b))
 
 
-def human_scroll(driver, max_scrolls=3):
+def human_scroll(driver, max_scrolls=5, 
+                 use_mouse_movement=True, 
+                 use_keyboard_scroll=True):
     """
         Simulates a more human-like scrolling behavior.
     """
     scroll_height = driver.execute_script("return document.body.scrollHeight")
     current_scroll = 0
 
+    actions = ActionChains(driver)
+
     for _ in range(max_scrolls):
+        # Optional mouse movement
+        if use_mouse_movement and random.random() < 0.7:
+            x_offset = random.randint(-100, 100)
+            y_offset = random.randint(-100, 100)
+            try:
+                actions.move_by_offset(x_offset, y_offset).perform()
+                actions.reset_actions()
+            except Exception:
+                pass  # in case offset is out of bounds        
+        
         # Occasionally pause longer as if user is reading
         if random.random() < 0.2:
             human_sleep(1.5, 3.5)
-        
-        # Scroll amount with variation
-        scroll_by = random.choice([
-            random.randint(100, 300),
-            random.randint(300, 900),
-            -random.randint(50, 200) if random.random() < 0.1 else 0  # occasionally scroll up
-        ])
 
-        driver.execute_script(f"window.scrollBy(0, {scroll_by});")
+        # Choose scroll method
+        if use_keyboard_scroll and random.random() < 0.1:
+            actions.send_keys(Keys.PAGE_DOWN).perform()
+            scroll_by = 600  # Approximate for PAGE_DOWN
+        else:        
+            # Scroll amount with variation
+            scroll_by = random.choice([
+                random.randint(100, 300),
+                random.randint(300, 900),
+                -random.randint(50, 200) if random.random() < 0.1 else 0  # occasionally scroll up
+            ])
+
+            driver.execute_script(f"window.scrollBy(0, {scroll_by});")
+
         current_scroll += scroll_by
         current_scroll = max(0, current_scroll)
 
         # Simulate scroll hesitation
-        human_sleep(0.1, 3)
+        human_sleep(0.1, 2)
 
         # Stop if we've reached near the bottom
         if current_scroll + random.randint(100, 500) > scroll_height:
@@ -82,6 +103,7 @@ def human_action(driver, num):
     """
         num = 0 -> 9
     """
+    
     if num == 0:
         pass
     if num == 1:
@@ -93,20 +115,14 @@ def human_action(driver, num):
         human_scroll(driver)
     if num == 4:
         human_scroll(driver)
-        human_sleep()
     if num == 5:
-        human_scroll(driver)
+        human_scroll(driver, 5, False, False)
         human_sleep()
         human_hover(driver)
     if num == 6:
         human_hover(driver)
         human_sleep()
-        human_scroll(driver)
-        human_sleep()
-        human_hover(driver)
+        human_scroll(driver, 1, False, True)
     if num >= 7:
-        human_hover(driver)
-        human_sleep()
-        human_hover(driver)
-        human_scroll(driver)
-        human_sleep()
+        human_scroll(driver, 3, True, False)
+    
