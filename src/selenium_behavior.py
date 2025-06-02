@@ -12,14 +12,14 @@ def wait_for_list_page_load(driver):
     WebDriverWait(driver, 2).until(
         lambda d: d.execute_script("return document.readyState") == "complete"
     )
-    WebDriverWait(driver, 2).until(
-        EC.presence_of_element_located((By.CSS_SELECTOR, "div.s-main-slot"))
+    WebDriverWait(driver, 4).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, "span.s-pagination-strip"))
     )
 
 
 def wait_for_product_page_load(driver):
     try:
-        WebDriverWait(driver, 3).until(
+        WebDriverWait(driver, 5).until(
             EC.presence_of_element_located((By.ID, "productTitle"))
         )
     except Exception as e:
@@ -148,7 +148,6 @@ def human_scroll_and_hover(
     links = driver.find_elements(By.TAG_NAME, "a")
     visible_links = [link for link in links if link.is_displayed() and 
                      link.get_attribute("href")]
-
 
     hover_count = random.randint(1, max_hovers)
     

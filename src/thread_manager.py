@@ -1,13 +1,13 @@
 import threading
 import queue
 import time
-from selenium import webdriver
+
 
 from .get_product_urls import get_product_urls
 from .get_product import get_product
-from .selenium_options import custom_options
+from .selenium_adapter import get_driver
 from .project_globals import (NUM_CONSUMERS, FIRST_LIST_PAGE_LOADED,
-                    PRODUCT_QUEUE)
+                    PRODUCT_QUEUE, FIRST_PRODUCT_AVAILABLE)
 
 # Assuming these two functions are defined by you:
 # def get_product_urls(listing_url): -> returns list of URLs
@@ -31,16 +31,22 @@ def get_products_processed():
         return products_processed
 
 
-def scraped_amazon_products(timeout=2):
+def scraped_amazon_products(timeout=10):
     """
         Iterable of amazon products
     """
+    print("Entering scraped amazon product")
+    count = 0
     while True:
+        count += 1
+        print("========\nAttempt {}\n=======".format(count))
         try:
             product = PRODUCT_QUEUE.get(timeout=timeout)
             yield product
         except Exception:
+            print("scraped amazon product exception reached.")
             if producers_done.is_set() and PRODUCT_QUEUE.empty():
+                print("========\nProducers is all done and the product queue is empty\n============")
                 break
 
 
@@ -48,7 +54,7 @@ def producer(listing_url):
     """
     
     """
-    driver = webdriver.Chrome(options=custom_options())
+    driver = get_driver()
 
     urls = get_product_urls(listing_url, driver)
     for url in urls:
@@ -68,7 +74,7 @@ def consumer(thread_id):
 
     """
     print("Thread {} has started".format(thread_id))
-    driver = webdriver.Chrome(options=custom_options())
+    driver = get_driver()
 
     while True:
         url = product_url_queue.get()

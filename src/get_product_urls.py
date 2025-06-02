@@ -112,6 +112,10 @@ def get_product_urls(list_url, driver):
         raise StopIteration
     
     html = driver.page_source
+
+    #with open("super-quick-test-1.html", "w") as f:
+    #    f.write(html)
+
     total_urls = scrape_list_page(html)
     FIRST_LIST_PAGE_LOADED.set()
     next_page_url = get_next_page_url(html)
