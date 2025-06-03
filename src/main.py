@@ -26,7 +26,7 @@ async def main() -> None:
         # Retrieve the input object for the Actor. The structure of input is defined in input_schema.json.
         actor_input = await Actor.get_input()
         url = actor_input.get('url')
-        print(url)
+        #print(url)
         if not url:
             raise ValueError('Missing "url" attribute in input!')
         

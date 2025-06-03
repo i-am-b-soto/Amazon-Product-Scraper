@@ -1,8 +1,8 @@
 {
 	"actorSpecification": 1,
-	"name": "Amazon-And-Ebay-Scraper",
-	"title": "Scrape single page in Python",
-	"description": "Scrape data from single page with provided URL.",
+	"name": "amazon-product-scraper",
+	"title": "Refined Amazon Product Scraper",
+	"description": "More Robust-ness in scraping US Amazon Product Pages",
 	"version": "0.0",
 	"buildTag": "latest",
 	"meta": {

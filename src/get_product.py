@@ -77,15 +77,29 @@ def scrape_regular_product(soup, product_url):
 
     return p
 
+def clearn_product_url(product_url):
+    """
+    
+    """
+    ref_index = product_url.find("/ref=")
+    if ref_index != -1:
+        return product_url[:ref_index]
+    else:
+        return product_url
+
 
 def scrape_product(html, product_url):
+    """
+
+    """
     soup = BeautifulSoup(html, "html.parser")
     p_type = get_type_of_product_page(soup)
 
     if p_type == "regular":
         a = scrape_regular_product(soup, product_url)
     
-    a._product_url = product_url
+
+    a._product_url = clearn_product_url(product_url)
 
     return a
     # Todo: Other types of product pages

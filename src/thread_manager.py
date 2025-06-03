@@ -7,7 +7,7 @@ from .get_product_urls import get_product_urls
 from .get_product import get_product
 from .selenium_adapter import get_driver
 from .project_globals import (NUM_CONSUMERS, FIRST_LIST_PAGE_LOADED,
-                    PRODUCT_QUEUE, FIRST_PRODUCT_AVAILABLE)
+                    PRODUCT_QUEUE)
 
 # Assuming these two functions are defined by you:
 # def get_product_urls(listing_url): -> returns list of URLs
