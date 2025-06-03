@@ -9,17 +9,23 @@ from selenium.webdriver.common.actions.wheel_input import ScrollOrigin
 
 
 def wait_for_list_page_load(driver):
-    WebDriverWait(driver, 2).until(
-        lambda d: d.execute_script("return document.readyState") == "complete"
-    )
-    WebDriverWait(driver, 4).until(
-        EC.presence_of_element_located((By.CSS_SELECTOR, "span.s-pagination-strip"))
-    )
+    try:
+        WebDriverWait(driver, 2).until(
+            lambda d: d.execute_script("return document.readyState") == "complete"
+        )
+        WebDriverWait(driver, 4).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "span.s-pagination-strip"))
+        )
+    except Exception as e:
+        print("Timed out waiting for page to load.", e)
 
 
 def wait_for_product_page_load(driver):
     try:
-        WebDriverWait(driver, 5).until(
+        WebDriverWait(driver, 2).until(
+            lambda d: d.execute_script("return document.readyState") == "complete"
+        )        
+        WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.ID, "productTitle"))
         )
     except Exception as e:

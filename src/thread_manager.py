@@ -35,18 +35,18 @@ def scraped_amazon_products(timeout=10):
     """
         Iterable of amazon products
     """
-    print("Entering scraped amazon product")
+    #print("Entering scraped amazon product")
     count = 0
     while True:
         count += 1
-        print("========\nAttempt {}\n=======".format(count))
+        #print("========\nAttempt {}\n=======".format(count))
         try:
             product = PRODUCT_QUEUE.get(timeout=timeout)
             yield product
         except Exception:
-            print("scraped amazon product exception reached.")
+            #print("scraped amazon product exception reached.")
             if producers_done.is_set() and PRODUCT_QUEUE.empty():
-                print("========\nProducers is all done and the product queue is empty\n============")
+                #print("========\nProducers is all done and the product queue is empty\n============")
                 break
 
 

@@ -12,9 +12,7 @@ if __name__ == "__main__":
     t.start()
 
     
-   
     with open("Aquired-Amazon-products.txt", "w") as f:
         print("Entering the file")
         for product in thread_manager.scraped_amazon_products():
-            f.write(json.loads(product.to_json()))
-            print("" + json.loads(product.to_json()))
+            f.write("{}\n".format(json.dumps(product.to_json())))
