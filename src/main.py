@@ -1,39 +1,82 @@
-"""Module defines the main entry point for the Apify Actor.
-
-Feel free to modify this file to suit your specific needs.
-
-To build Apify Actors, utilize the Apify SDK toolkit, read more at the official documentation:
-https://docs.apify.com/sdk/python
-"""
-
-from __future__ import annotations
-import threading
-
 from apify import Actor
+from apify.storages import Dataset, RequestQueue
+from apify_client import ApifyClient
+from playwright.async_api import async_playwright
 
 
-from . import thread_manager
+SEARCH_URL = "https://www.amazon.com/s?k=gaming+headsets"
 
 
-async def main() -> None:
-    """Define a main entry point for the Apify Actor.
+async def enqueue_listing_page(queue, url):
+    await queue.add_request({
+        "url": url,
+        "userData": {"label": "LIST"}
+    })
 
-    This coroutine is executed using `asyncio.run()`, so it must remain an asynchronous function for proper execution.
-    Asynchronous execution is required for communication with Apify platform, and it also enhances performance in
-    the field of web scraping significantly.
-    """
+async def enqueue_product_page(queue, url):
+    await queue.add_request({
+        "url": url,
+        "userData": {"label": "PRODUCT"}
+    })
+
+
+async def handle_list_page(page, queue):
+    print("Handling list page:", page.url)
+
+    # Get product links
+    product_anchors = await page.locator('a.a-link-normal.s-no-outline').all()
+    for anchor in product_anchors:
+        href = await anchor.get_attribute("href")
+        if href:
+            await enqueue_product_page(queue, "https://www.amazon.com" + href)
+
+    # Queue next page
+    next_btn = page.locator("a.s-pagination-next")
+    if await next_btn.is_visible():
+        href = await next_btn.get_attribute("href")
+        if href:
+            await enqueue_listing_page(queue, "https://www.amazon.com" + href)
+
+
+async def handle_product_page(page, dataset):
+    print("Handling product page:", page.url)
+    title = await page.locator("#productTitle").text_content()
+    price = await page.locator(".a-price .a-offscreen").first.text_content()
+    asin = page.url.split("/dp/")[-1].split("/")[0]
+
+    await dataset.push_data({
+        "url": page.url,
+        "title": title.strip() if title else None,
+        "price": price.strip() if price else None,
+        "asin": asin,
+    })
+
+
+async def main():
     async with Actor:
-        # Retrieve the input object for the Actor. The structure of input is defined in input_schema.json.
-        actor_input = await Actor.get_input()
-        url = actor_input.get('url')
-        #print(url)
-        if not url:
-            raise ValueError('Missing "url" attribute in input!')
-        
-        t = threading.Thread(target=thread_manager.start, args=(url,))
-        t.start()
+        queue = await RequestQueue.open()
+        dataset = await Dataset.open()
+        await enqueue_listing_page(queue, SEARCH_URL)
 
-        for product in thread_manager.scraped_amazon_products():
-            await Actor.push_data(product.to_json())
+        async with async_playwright() as pw:
+            browser = await pw.chromium.launch(headless=True)
+            context = await browser.new_context()
+            while True:
+                request = await queue.fetch_next_request()
+                if not request:
+                    break
 
-
+                page = await context.new_page()
+                try:
+                    await page.goto(request["url"], timeout=60000)
+                    label = request["userData"].get("label")
+                    if label == "LIST":
+                        await handle_list_page(page, queue)
+                    elif label == "PRODUCT":
+                        await handle_product_page(page, dataset)
+                    await queue.mark_request_handled(request)
+                except Exception as e:
+                    print("Error:", e)
+                    await queue.reclaim_request(request)
+                await page.close()
+            await browser.close()
