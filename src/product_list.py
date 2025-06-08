@@ -1,7 +1,7 @@
-import random
+#import random
 from bs4 import BeautifulSoup
-from .selenium_behavior import wait_for_list_page_load, human_action
-from .project_globals import FIRST_LIST_PAGE_LOADED
+#from .selenium_behavior import wait_for_list_page_load, human_action
+#from .project_globals import FIRST_LIST_PAGE_LOADED
 
 
 def get_next_page_url(html):
@@ -98,51 +98,18 @@ def scrape_list_page(html):
     return urls_on_page
 
 
-def get_product_urls(list_url, driver):
+async def get_product_urls(page):
     """
         Given a list of items, either from a search result or category, return a list of all dem urls
     """
 
-    try:
-        driver.get(list_url)
-        wait_for_list_page_load(driver)
-    except Exception as e:
-        print("There was an issue aquiriing the Amazon list url {}: {}"
-              .format(list_url, e))
-        raise StopIteration
-    
-    html = driver.page_source
+    html = await page.content()
 
-    #with open("super-quick-test-1.html", "w") as f:
-    #    f.write(html)
-
-    total_urls = scrape_list_page(html)
-    FIRST_LIST_PAGE_LOADED.set()
     next_page_url = get_next_page_url(html)
-    current_page = 1
-    
-    for url in total_urls:
-        yield url
+    return (scrape_list_page(html), next_page_url)
 
-    while next_page_url is not None:
-        current_page += 1
-        
-        try:
-            driver.get(next_page_url)
-            wait_for_list_page_load(driver)
-        except Exception as e:
-            print("There was an issue aquiriing the Amazon list url{}: {}"
-                .format(next_page_url, e))
-            raise StopIteration
 
-        html = driver.page_source
-        total_urls = scrape_list_page(html)
-        next_page_url = get_next_page_url(html)
 
-        human_action(driver, random.randint(0, 8))
-
-        for url in total_urls:
-            yield url
 
 
 if __name__ == "__main__":
