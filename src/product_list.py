@@ -25,7 +25,11 @@ def what_type_of_list(soup):
         Determine what type of list the product list page is (currently identified 2 types - Grid and row)
     """
     list_items = soup.find_all("div", attrs={"role": "listitem"})
-    li = list_items[0]
+
+    if len(list_items) > 0:
+        li = list_items[0]
+    else:
+        raise Exception("Can't determine type of product list page") 
 
     if li.find("div", class_="puis-card-container"):
         return "rows"
@@ -40,14 +44,12 @@ def scrape_rows(soup):
     list_items = soup.find_all("div", attrs={"role": "listitem"})
 
     links = []
-
+    #print("found list items")
     for div in list_items:
         card_container = div.find("div", class_="puis-card-container")
         if div.find("span", string="sponsored") is not None:
-           
             continue
         if card_container:
-
             a_tag = card_container.find("a", class_="a-link-normal")
             if a_tag and 'href' in a_tag.attrs:
                 link_string = a_tag['href']
@@ -86,8 +88,9 @@ def scrape_grid(soup):
 
 def scrape_list_page(html):
     soup = BeautifulSoup(html, "html.parser")
+    #print(soup)
     page_type = what_type_of_list(soup)
-
+    #print("We have the page_type: {}".format(page_type))
     urls_on_page = []
 
     if page_type == "grid":
@@ -104,9 +107,15 @@ async def get_product_urls(page):
     """
 
     html = await page.content()
-
+    with open("Test-4.txt", "w") as f:
+        f.write(html)
+    #print(" I got the html")
+    product_urls = scrape_list_page(html)
+    #print("I got the product urls!")
     next_page_url = get_next_page_url(html)
-    return (scrape_list_page(html), next_page_url)
+    #print("I got the next page url!")
+
+    return (product_urls, next_page_url)
 
 
 

@@ -28,52 +28,73 @@ async def handle_list_page(page, queue):
 
 
 async def process_request(queue, dataset, context, request):
-    async with SEMAPHORE:
-        page = await context.new_page()
-        try:
-            await page.goto(request["url"], timeout=60000)
-            label = request["user_data"].get("label")
 
-            if label == "LIST":
-                await handle_list_page(page, queue)
-            elif label == "PRODUCT":
-                await handle_product_page(page, dataset)
+    page = await context.new_page()
+    try:
+        await page.goto(request.url, timeout=60000, wait_until="networkidle")
+        #print("request: {}".format(request))
+        label = request.label
+        #print("label: {}".format(label))
 
-            await queue.mark_request_handled(request)
-        except Exception as e:
-            print(f"[ERROR] {request['url']}: {e}")
-            await queue.reclaim_request(request)
-        finally:
-            await page.close()
+        if label == "LIST":
+            (product_urls, next_page_url) = await handle_list_page(page, queue)
+        elif label == "PRODUCT":
+            await handle_product_page(page, dataset)
+
+        await queue.mark_request_as_handled(request)
+    except Exception as e:
+        Actor.log.error("ERROR: {} {}".format(request.url, e))
+        #await queue.reclaim_request(request)
+    finally:
+        await page.close()
 
 
 async def main():
     async with Actor:
-        queue = await RequestQueue.open(name='Amazon-product-urls')
+        queue = await RequestQueue.open()
         dataset = await Dataset.open()
 
         # Seed if empty
         if await queue.get_handled_count() == 0:
-            await queue.add_request(Request.from_url(url="https://www.amazon.com/s?k=gaming+headsets", label="LIST"))
+            r = Request.from_url(url="https://www.amazon.com/s?k=fitness+equipment&_encoding=UTF8", label="LIST")
+            add_request_info = await queue.add_request(r)
+            Actor.log.info(f'Add request info: {add_request_info}')
+            processed_request = await queue.get_request(add_request_info.id)
+            Actor.log.info(f'Processed request: {processed_request}')
 
         async with async_playwright() as pw:
             browser = await pw.chromium.launch(headless=True)
             context = await browser.new_context()
 
             tasks = []
-            while True:
+            while not await queue.is_finished():
                 request = await queue.fetch_next_request()
-                if not request:
-                    break
+
+                if request is None:
+                    await asyncio.sleep(1)
+                    continue
+
+                Actor.log.info(f'Pulled Request from Queue: {request.url}...')
+                #Actor.log.info(f'Scraping URL {request.url}...')
+
+                # Wait for a semaphore permit
+                await SEMAPHORE.acquire()
+
                 task = asyncio.create_task(
                     process_request(queue, dataset, context, request)
                 )
+
+                # When done, release the semaphore
+                task.add_done_callback(lambda t: SEMAPHORE.release())                
+
                 tasks.append(task)
 
+                """
                 # Wait for all concurrent tasks to finish before continuing
                 if len(tasks) >= CONCURRENCY:
                     await asyncio.gather(*tasks)
                     tasks = []
+                """
 
             # Wait for any remaining tasks
             if tasks:
