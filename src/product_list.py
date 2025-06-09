@@ -111,12 +111,9 @@ async def get_product_urls(page):
     product_urls = scrape_list_page(html)
     #print("I got the product urls!")
     next_page_url = get_next_page_url(html)
-    #print("I got the next page url!")
+
 
     return (product_urls, next_page_url)
-
-
-
 
 
 if __name__ == "__main__":
