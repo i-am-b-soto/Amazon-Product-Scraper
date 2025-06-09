@@ -107,9 +107,7 @@ async def get_product_urls(page):
     """
 
     html = await page.content()
-    with open("Test-4.txt", "w") as f:
-        f.write(html)
-    #print(" I got the html")
+
     product_urls = scrape_list_page(html)
     #print("I got the product urls!")
     next_page_url = get_next_page_url(html)

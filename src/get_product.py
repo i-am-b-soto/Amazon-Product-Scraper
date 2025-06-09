@@ -90,12 +90,11 @@ def scrape_product(html, product_url):
     if p_type == "regular":
         a = scrape_regular_product(soup, product_url)
     
-
     return a
     # Todo: Other types of product pages
 
 
-async def get_product(page):
+async def get_product(page, product_url):
     """
         Given a list of items, either from a search result or category, return a representation of 
             an Amazon product. Or None if the page couldn't be accessed
@@ -103,7 +102,7 @@ async def get_product(page):
 
     html = await page.content()
     
-    p = scrape_product(html)
+    p = scrape_product(html, product_url)
 
     #human_action(driver, random.randint(0, 8))
 

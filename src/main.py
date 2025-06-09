@@ -8,11 +8,10 @@ from .get_product import get_product
 
 
 CONCURRENCY = 5  # Number of parallel pages
-SEMAPHORE = asyncio.Semaphore(CONCURRENCY)
 
 
-async def handle_product_page(page, dataset):
-    product = get_product(page)
+async def handle_product_page(page, product_url):
+    product = await get_product(page, product_url)
     await Actor.push_data(product.to_json())
 
 
@@ -24,32 +23,45 @@ async def handle_list_page(page, queue):
 
     # Queue next page
     if next_page_url is not None:
-        await queue.add_request(Request.from_url(url=url, laebl="LIST"))
+        await queue.add_request(Request.from_url(url=url, label="LIST"))
 
 
-async def process_request(queue, dataset, context, request):
+async def process_request(queue, dataset, browser, request, semaphore):
+    async with semaphore:
+        context = await browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64)...",
+            viewport={'width': 1280, 'height': 800},
+            locale="en-US",
+            java_script_enabled=True,
+            timezone_id="America/New_York"
+        )
 
-    page = await context.new_page()
-    try:
-        await page.goto(request.url, timeout=60000, wait_until="networkidle")
-        #print("request: {}".format(request))
-        label = request.label
-        #print("label: {}".format(label))
+        page = await context.new_page()
+        try:
+            await page.goto(request.url, timeout=60000, wait_until="domcontentloaded")
+            #print("request: {}".format(request))
+            label = request.label
+            #print("label: {}".format(label))
 
-        if label == "LIST":
-            (product_urls, next_page_url) = await handle_list_page(page, queue)
-        elif label == "PRODUCT":
-            await handle_product_page(page, dataset)
+            if label == "LIST":
+                await handle_list_page(page, queue)
 
-        await queue.mark_request_as_handled(request)
-    except Exception as e:
-        Actor.log.error("ERROR: {} {}".format(request.url, e))
-        #await queue.reclaim_request(request)
-    finally:
-        await page.close()
+            elif label == "PRODUCT":
+                await handle_product_page(page, request.url)
+
+            await queue.mark_request_as_handled(request)
+            Actor.log.info("We have marked a request as handled!")
+        except Exception as e:
+            Actor.log.error("ERROR: {} {}".format(request.url, e))
+            #await queue.reclaim_request(request)
+        finally:
+            await page.close()
+            await context.close()
 
 
 async def main():
+    SEMAPHORE = asyncio.Semaphore(CONCURRENCY)
+
     async with Actor:
         queue = await RequestQueue.open()
         dataset = await Dataset.open()
@@ -63,8 +75,7 @@ async def main():
             Actor.log.info(f'Processed request: {processed_request}')
 
         async with async_playwright() as pw:
-            browser = await pw.chromium.launch(headless=True)
-            context = await browser.new_context()
+            browser = await pw.chromium.launch(headless=False)
 
             tasks = []
             while not await queue.is_finished():
@@ -75,26 +86,14 @@ async def main():
                     continue
 
                 Actor.log.info(f'Pulled Request from Queue: {request.url}...')
-                #Actor.log.info(f'Scraping URL {request.url}...')
-
-                # Wait for a semaphore permit
-                await SEMAPHORE.acquire()
 
                 task = asyncio.create_task(
-                    process_request(queue, dataset, context, request)
+                    process_request(queue, dataset, browser, request, 
+                                    SEMAPHORE)
                 )
-
-                # When done, release the semaphore
-                task.add_done_callback(lambda t: SEMAPHORE.release())                
 
                 tasks.append(task)
 
-                """
-                # Wait for all concurrent tasks to finish before continuing
-                if len(tasks) >= CONCURRENCY:
-                    await asyncio.gather(*tasks)
-                    tasks = []
-                """
 
             # Wait for any remaining tasks
             if tasks:
