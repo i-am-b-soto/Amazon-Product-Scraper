@@ -121,47 +121,45 @@ async def process_request(queue, context, request, context_queue):
         await context_queue.put(context)
 
 
-async def get_new_proxy():
+async def get_new_proxy(proxy_info):
     """
     
     """
-    proxy_info = await Actor.create_proxy_configuration(groups=["RESIDENTIAL"], 
-                                                        country_code='US')
     proxy_url = await proxy_info.new_url()
 
     parsed = urlparse(proxy_url)
 
-    #proxy_server = f"{parsed.scheme}://{parsed.hostname}:{parsed.port}"
-    proxy_server = proxy_url
+    proxy_server = f"{parsed.scheme}://{parsed.hostname}:{parsed.port}"
+    #proxy_server = proxy_url
     proxy_username = parsed.username
     proxy_password = parsed.password
 
     return (proxy_server, proxy_username, proxy_password)
 
 
-async def get_new_browser(pw):
+async def get_new_browser(pw, proxy_info):
     """
 
     """
-    (proxy_server, proxy_username, proxy_password) = await get_new_proxy()
-    #browser = await pw.chromium.launch(headless=False, proxy={"server": "http://groups-RESIDENTIAL,country-US:apify_proxy_hIqCMm9uxsg3o2TfOuBXv9fjJA95eR1LqA6v@proxy.apify.com:8000", 
-    #                                                          "username": proxy_username, 
-    #                                                          "password": "apify_proxy_hIqCMm9uxsg3o2TfOuBXv9fjJA95eR1LqA6v"})
+    (proxy_server, proxy_username, proxy_password) = await get_new_proxy(proxy_info)
+    browser = await pw.chromium.launch(headless=False, proxy={"server": proxy_server, 
+                                                              "username": proxy_username, 
+                                                              "password": proxy_password})
     #browser = await pw.chromium.launch(headless=False)
-    browser = await pw.chromium.launch(headless=False, proxy={"server": 
-                                                              proxy_server})
+    #browser = await pw.chromium.launch(headless=False, proxy={"server": 
+    #                                                          proxy_server})
     return browser
 
 
-async def generate_contexts(pw):
+async def generate_contexts(pw, proxy_info):
     """
     
     """
     for _ in range(NUM_CONTEXTS):
-        browser = await get_new_browser(pw)
+        browser = await get_new_browser(pw, proxy_info)
         context = await browser.new_context(
-            user_agent=random_user_agent(),
-            viewport=random_viewport(),
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+            viewport={"width": 1480, "height": 800},
             locale="en-US",
             java_script_enabled=True,
             timezone_id="America/New_York"
@@ -188,18 +186,18 @@ async def main():
 
     async with Actor:
         queue = await RequestQueue.open()
+        proxy_info = await Actor.create_proxy_configuration(groups=["RESIDENTIAL"], country_code='US')        
+
 
         if await queue.get_handled_count() == 0:
             r = Request.from_url(url="https://www.amazon.com/s?k=fitness+equipment&_encoding=UTF8", label="LIST")
             add_request_info = await queue.add_request(r)
             Actor.log.info(f'Add request info: {add_request_info}')
-            processed_request = await queue.get_request(add_request_info.id)
-            Actor.log.info(f'Processed request: {processed_request}')
 
         async with async_playwright() as pw:
             tasks = []
 
-            await generate_contexts(pw) # Generate contexts to use
+            await generate_contexts(pw, proxy_info) # Generate contexts to use
             for context in CONTEXTS:
                 await context_queue.put(context)
             
