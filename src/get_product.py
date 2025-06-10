@@ -22,13 +22,15 @@ def get_price_regular(soup):
     if whole_number_span:
         whole_number = whole_number_span.get_text()
     else:
-        print("Whole number does not exist")
+        pass
+        #print("Whole number does not exist")
     
     decimal_number_span = soup.find('span', class_='a-price-fraction')
     if decimal_number_span:
         decimal_number = decimal_number_span.get_text()
     else:
-        print("Decimal number does not exist")
+        pass
+        #print("Decimal number does not exist")
     
     return "{}{}".format(whole_number, decimal_number)
 
@@ -40,7 +42,8 @@ def get_description_regular(soup):
     if description_div:
         text = description_div.get_text()
     else:
-        print("Can't find description")
+        pass
+        #print("Can't find description")
     
     return text 
 
@@ -56,9 +59,11 @@ def get_title_regular(soup):
         if title_span:
             title = title_span.get_text().strip()
         else:
-            print("No title span")
+            pass
+            #print("No title span")
     else:
-        print("No h1 title")
+        raise Exception("Cannot find title")
+        #print("No h1 title")
 
     return title 
 
@@ -73,8 +78,6 @@ def scrape_regular_product(soup, product_url):
 
     p = AmazonProduct(title=title, price=price, description=description, 
                       url=product_url)
-    
-    p.fix_url()
 
     return p
 

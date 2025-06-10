@@ -8,12 +8,15 @@ class AmazonProduct:
         self._title = title
         self._price = price
         self._description = description
-        self._url = url
+        self._url = AmazonProduct.fix_url(url)
 
-    def fix_url(self):
-        ref_index = self._url.find('/ref=')
+    @staticmethod
+    def fix_url(url):
+        ref_index = url.find('/ref=')
         if ref_index != -1:
-            self._url = self._url[:ref_index]        
+            url = url[:ref_index]
+
+        return url        
 
     def to_json(self):
         return {"Title": self._title, "Price": self._price, 
