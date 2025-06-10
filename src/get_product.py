@@ -102,6 +102,8 @@ async def get_product(page, product_url):
         Given a list of items, either from a search result or category, return a representation of 
             an Amazon product. Or None if the page couldn't be accessed
     """
+    await page.locator("h1#title").wait_for(state="visible", 
+                                            timeout=6000)       
 
     html = await page.content()
     

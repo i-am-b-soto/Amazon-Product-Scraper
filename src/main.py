@@ -11,45 +11,13 @@ from .get_product import get_product
 from .AmazonProduct import AmazonProduct
 
 
-CONCURRENCY = 5  # Number of parallel pages
-MAX_IDLE_CYCLES = 60 # Number of seconds to wait to pull from the queue
+CONCURRENCY = 8  # Number of parallel pages
+MAX_IDLE_CYCLES = 120 # Number of seconds to wait to pull from the queue
 REQUEST_TIMEOUT = 8000 # Num of seconds to wait for a single page
-NUM_CONTEXTS = 8 # Number of contexts to have
-NUM_BROWSERS = NUM_CONTEXTS
-CONTEXTS = [] # Global list of contexts
-BROWSERS = []
-
-
-def random_user_agent():
-    """
-    
-    """
-    user_agents = [
-        # Desktop Chrome user agents
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_5_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Safari/605.1.15",
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36",
-        # Mobile Safari
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 16_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1",
-        # Firefox desktop
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:117.0) Gecko/20100101 Firefox/117.0",
-        # Add more user agents as you like
-    ]
-    return random.choice(user_agents)
-
-
-def random_viewport():
-    """
-    
-    """
-    viewports = [
-        {"width": 1920, "height": 1080},
-        {"width": 1366, "height": 920},
-        {"width": 1440, "height": 900},
-        {"width": 1200, "height": 1000},
-        {"width": 1280, "height": 800}
-    ]
-    return random.choice(viewports)
+# NUM_CONTEXTS = 8 # Number of contexts to have
+# NUM_BROWSERS = NUM_CONTEXTS
+# CONTEXTS = [] # Global list of contexts
+# BROWSERS = []
 
 
 async def handle_product_page(page, product_url):
@@ -79,46 +47,66 @@ async def handle_list_page(page, queue):
             Request.from_url(url=AmazonProduct.fix_url(url), label="LIST"))
 
 
-async def process_request(queue, context, request, context_queue):
+async def process_request(queue, pw, proxy_info, request, semaphore):
     """
         Process a request from the queue
     """
+    async with semaphore:
+        browser = await get_new_browser(pw, proxy_info)
+        context = await browser.new_context(user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/122.0.0.0 Safari/537.36"
+                ),
+                locale="en-US",
+                viewport={"width": 1920, "height": 1080},
+                is_mobile=False,
+                extra_http_headers={
+                    "Accept-Language": "en-US,en;q=0.9",
+                    "Upgrade-Insecure-Requests": "1",
+                    "Sec-Fetch-Site": "none",
+                    "Sec-Fetch-Mode": "navigate",
+                    "Sec-Fetch-User": "?1",
+                    "Sec-Fetch-Dest": "document",
+                }
+        )
+        page = await context.new_page()
+        reader_friendly_url = AmazonProduct.fix_url(request.url)
+        try:
+            await page.goto(request.url, timeout=REQUEST_TIMEOUT, 
+                            wait_until="domcontentloaded")
+            
+            label = request.label
 
-    page = await context.new_page()
-    reader_friendly_url = AmazonProduct.fix_url(request.url)
-    try:
-        await page.goto(request.url, timeout=REQUEST_TIMEOUT, 
-                        wait_until="domcontentloaded")
-        label = request.label
+            if label == "LIST":
+                await handle_list_page(page, queue)
 
-        if label == "LIST":
-            await handle_list_page(page, queue)
+            elif label == "PRODUCT":
+                await handle_product_page(page, request.url)
 
-        elif label == "PRODUCT":
-            await handle_product_page(page, request.url)
+            await queue.mark_request_as_handled(request)
+            Actor.log.info("✅ Successfully handled request: {}".format(request.url))
 
-        await queue.mark_request_as_handled(request)
-        Actor.log.info("Handled request: {}".format(request.url))
+        except Exception as e:
+            Actor.log.error(e)
+            Actor.log.info("Num retries: {}".format(request.user_data.get("retries", 0)))
+            retries = request.user_data.get("retries", 0)
+            Actor.log.warning(f"Error on {reader_friendly_url} (attempt {retries + 1}): {e}")
+            
+            if retries < 2:
+                request.user_data["retries"] = retries + 1
+                Actor.log.info(f"Retrying {reader_friendly_url} (retry {retries + 1})")                
+                await asyncio.sleep(2 ** retries)
+                await queue.reclaim_request(request)
 
-    except Exception as e:
-        retries = request.user_data.get("retries", 0)
-        Actor.log.warning(f"Error on {reader_friendly_url} \
-                            (attempt {retries + 1}): {e}")
-        
-        if retries < 2:
-            request.user_data["retries"] = retries + 1
-            Actor.log.info(f"Retrying {reader_friendly_url} \
-                            (retry {retries + 1})")                
-            await asyncio.sleep(2 ** retries)
-            await queue.reclaim_request(request)
+            else:
+                Actor.log.error(f"Failed permanently: {reader_friendly_url} after {retries + 1} attempts")
 
-        else:
-            Actor.log.error(f"Failed permanently: {reader_friendly_url} after \
-                            {retries + 1} attempts")
+        finally:
+            await page.close()
+            await context.close()
+            await browser.close()
 
-    finally:
-        await page.close()
-        await context_queue.put(context)
 
 
 async def get_new_proxy(proxy_info):
@@ -146,35 +134,7 @@ async def get_new_browser(pw, proxy_info):
                                                               "username": proxy_username, 
                                                               "password": proxy_password})
     #browser = await pw.chromium.launch(headless=False)
-    #browser = await pw.chromium.launch(headless=False, proxy={"server": 
-    #                                                          proxy_server})
     return browser
-
-
-async def generate_contexts(pw, proxy_info):
-    """
-    
-    """
-    for _ in range(NUM_CONTEXTS):
-        browser = await get_new_browser(pw, proxy_info)
-        context = await browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
-            viewport={"width": 1480, "height": 800},
-            locale="en-US",
-            java_script_enabled=True,
-            timezone_id="America/New_York"
-        )
-        CONTEXTS.append(context)
-        BROWSERS.append(browser)
-
-
-async def close_contexts():
-    """
-    
-    """
-    for i in range(NUM_CONTEXTS):
-        await CONTEXTS[i].close()
-        await BROWSERS[i].close()
 
 
 async def main():
@@ -182,7 +142,7 @@ async def main():
 
     """
     idle_cycles = 0
-    context_queue = asyncio.Queue()
+    semaphore = asyncio.Semaphore(2)
 
     async with Actor:
         queue = await RequestQueue.open()
@@ -190,17 +150,13 @@ async def main():
 
 
         if await queue.get_handled_count() == 0:
-            r = Request.from_url(url="https://www.amazon.com/s?k=fitness+equipment&_encoding=UTF8", label="LIST")
+            r = Request.from_url(url="https://www.amazon.com/s?k=cooker&_encoding=UTF8", label="LIST")
             add_request_info = await queue.add_request(r)
             Actor.log.info(f'Add request info: {add_request_info}')
 
         async with async_playwright() as pw:
             tasks = []
 
-            await generate_contexts(pw, proxy_info) # Generate contexts to use
-            for context in CONTEXTS:
-                await context_queue.put(context)
-            
             while not await queue.is_finished():
                 request = await queue.fetch_next_request()
                 if request is None:
@@ -212,29 +168,22 @@ async def main():
 
                     await asyncio.sleep(1)
                     continue
-
-                Actor.log.info(f'Processing request from Queue: \
-                               {AmazonProduct.fix_url(request.url)}...')
-                
-                try:
-                    context = await asyncio.wait_for(context_queue.get(), 
-                                                     timeout=REQUEST_TIMEOUT + 5.00)
-                except asyncio.TimeoutError:
-                    Actor.log.error("Timeout waiting for context")
-                    break
                 else:
-                    task = asyncio.create_task(
-                        process_request(queue, 
-                                        context, 
-                                        request, 
-                                        context_queue)
-                    )
-                    tasks.append(task)
+                    idle_cycles = 0
+
+                #Actor.log.info(f'Processing request from Queue: {AmazonProduct.fix_url(request.url)}')
+
+                task = asyncio.create_task(
+                    process_request(queue, 
+                                    pw,
+                                    proxy_info,
+                                    request, 
+                                    semaphore)
+                )
+                tasks.append(task)
 
 
             # Wait for any remaining tasks
             if tasks:
                 await asyncio.gather(*tasks)
             
-            # Close all contexts
-            await close_contexts()
