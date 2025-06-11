@@ -14,6 +14,8 @@ from .AmazonProduct import AmazonProduct
 CONCURRENCY = 8  # Number of parallel pages
 MAX_IDLE_CYCLES = 120 # Number of seconds to wait to pull from the queue
 REQUEST_TIMEOUT = 12000 # Num of seconds to wait for a single page
+
+NON_ALLOWED_RESOURCE_TYPES = {"png", "jpg", "jpeg"}
 # NUM_CONTEXTS = 8 # Number of contexts to have
 # NUM_BROWSERS = NUM_CONTEXTS
 # CONTEXTS = [] # Global list of contexts
@@ -49,6 +51,13 @@ async def handle_list_page(page, queue):
         Actor.log.info("Adding {} to queue".format(next_page_url))
 
 
+def block_unnecessary_resources(route, request):
+    if request.resource_type in NON_ALLOWED_RESOURCE_TYPES:
+        route.abort()
+    else:
+        route.continue_()
+
+
 async def process_request(queue, pw, proxy_info, request, semaphore):
     """
         Process a request from the queue
@@ -61,7 +70,7 @@ async def process_request(queue, pw, proxy_info, request, semaphore):
                     "Chrome/122.0.0.0 Safari/537.36"
                 ),
                 locale="en-US",
-                viewport={"width": 1920, "height": 1080},
+                viewport={"width": 1420, "height": 1080},
                 is_mobile=False,
                 extra_http_headers={
                     "Accept-Language": "en-US,en;q=0.9",
@@ -75,6 +84,7 @@ async def process_request(queue, pw, proxy_info, request, semaphore):
         page = await context.new_page()
         reader_friendly_url = AmazonProduct.fix_url(request.url)
         try:
+            await page.route("**/*.{png,jpg,jpeg}", lambda route: route.abort())          
             await page.goto(request.url, timeout=REQUEST_TIMEOUT, 
                             wait_until="domcontentloaded")
             
