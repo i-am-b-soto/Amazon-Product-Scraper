@@ -13,7 +13,7 @@ from .AmazonProduct import AmazonProduct
 
 CONCURRENCY = 8  # Number of parallel pages
 MAX_IDLE_CYCLES = 120 # Number of seconds to wait to pull from the queue
-REQUEST_TIMEOUT = 8000 # Num of seconds to wait for a single page
+REQUEST_TIMEOUT = 12000 # Num of seconds to wait for a single page
 # NUM_CONTEXTS = 8 # Number of contexts to have
 # NUM_BROWSERS = NUM_CONTEXTS
 # CONTEXTS = [] # Global list of contexts
@@ -44,7 +44,9 @@ async def handle_list_page(page, queue):
     # Queue next page
     if next_page_url is not None:
         await queue.add_request(
-            Request.from_url(url=AmazonProduct.fix_url(url), label="LIST"))
+            Request.from_url(next_page_url, label="LIST"))
+    
+        Actor.log.info("Adding {} to queue".format(next_page_url))
 
 
 async def process_request(queue, pw, proxy_info, request, semaphore):
@@ -85,22 +87,21 @@ async def process_request(queue, pw, proxy_info, request, semaphore):
                 await handle_product_page(page, request.url)
 
             await queue.mark_request_as_handled(request)
-            Actor.log.info("✅ Successfully handled request: {}".format(request.url))
+            Actor.log.info("✅ Successfully processed request: {}".format(request.url))
 
         except Exception as e:
             Actor.log.error(e)
-            Actor.log.info("Num retries: {}".format(request.user_data.get("retries", 0)))
             retries = request.user_data.get("retries", 0)
             Actor.log.warning(f"Error on {reader_friendly_url} (attempt {retries + 1}): {e}")
             
             if retries < 2:
                 request.user_data["retries"] = retries + 1
                 Actor.log.info(f"Retrying {reader_friendly_url} (retry {retries + 1})")                
-                await asyncio.sleep(2 ** retries)
+                await asyncio.sleep(1)
                 await queue.reclaim_request(request)
-
+ 
             else:
-                Actor.log.error(f"Failed permanently: {reader_friendly_url} after {retries + 1} attempts")
+                Actor.log.error(f"❌ Failed permanently: {reader_friendly_url} after {retries + 1} attempts")
 
         finally:
             await page.close()
@@ -149,10 +150,10 @@ async def main():
         proxy_info = await Actor.create_proxy_configuration(groups=["RESIDENTIAL"], country_code='US')        
 
 
-        if await queue.get_handled_count() == 0:
-            r = Request.from_url(url="https://www.amazon.com/s?k=cooker&_encoding=UTF8", label="LIST")
-            add_request_info = await queue.add_request(r)
-            Actor.log.info(f'Add request info: {add_request_info}')
+
+        r = Request.from_url(url="https://www.amazon.com/s?k=cooker&_encoding=UTF8", label="LIST")
+        add_request_info = await queue.add_request(r)
+        Actor.log.info(f'Add request info: {add_request_info}')
 
         async with async_playwright() as pw:
             tasks = []
