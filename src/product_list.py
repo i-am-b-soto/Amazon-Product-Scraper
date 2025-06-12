@@ -112,7 +112,6 @@ async def get_product_urls(page):
     #print("I got the product urls!")
     next_page_url = get_next_page_url(html)
 
-
     return (product_urls, next_page_url)
 
 

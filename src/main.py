@@ -1,71 +1,36 @@
 import asyncio
-import random
 from apify import Actor
+from crawlee import Request
 from apify.storages import RequestQueue
 from urllib.parse import urlparse
-from crawlee import Request
+
 from playwright.async_api import async_playwright
-
-from .product_list import get_product_urls
-from .get_product import get_product
-from .AmazonProduct import AmazonProduct
+from playwright.async_api import TimeoutError, Error as playwright_error
+from request_handlers import handle_product_page, handle_list_page
 
 
-CONCURRENCY = 8  # Number of parallel pages
-MAX_IDLE_CYCLES = 120 # Number of seconds to wait to pull from the queue
-REQUEST_TIMEOUT = 12000 # Num of seconds to wait for a single page
-
-NON_ALLOWED_RESOURCE_TYPES = {"png", "jpg", "jpeg"}
-# NUM_CONTEXTS = 8 # Number of contexts to have
-# NUM_BROWSERS = NUM_CONTEXTS
-# CONTEXTS = [] # Global list of contexts
-# BROWSERS = []
-
-banned_domains = ["m.media-amazon.com", "images-na.ssl-images-amazon.com"]
+SEMAPHORE_CONCURRENCY = 8
+MAX_IDLE_CYCLES = 120
+REQUEST_TIMEOUT = 12000
+BANNED_DOMAINS = ["media-amazon.com", "ssl-images-amazon.com", 
+                  "amazon-adsystem.com"]
 
 
 async def block_images(route, request):
-    if route.request.resource_type == "image":
-        #print(f"Blocking image: {route.request.url}")
+    """
+
+    """
+    if route.request.resource_type in {"image", "media"}:
         await route.abort()
     else:
         l = False
-        for domain in banned_domains:
+        for domain in BANNED_DOMAINS:
             if request.url.find(domain) != -1:
                 await route.abort()
                 l = True
         else:
             if not l:
                 await route.continue_()
-
-
-async def handle_product_page(page, product_url):
-    """
-        Handle a product page request
-    """
-    product = await get_product(page, product_url)
-    await Actor.push_data(product.to_json())
-
-
-async def handle_list_page(page, queue):
-    """
-        Handle a list page request
-    """
-    (product_urls, next_page_url) = await get_product_urls(page)
-    requests = []
-    for url in product_urls:
-        requests.append(
-            Request.from_url(url=AmazonProduct.fix_url(url), label="PRODUCT"))
-    
-    Actor.log.info("Adding {} urls to queue".format(len(requests)))
-    await queue.add_requests_batched(requests)
-
-    # Queue next page
-    if next_page_url is not None:
-        await queue.add_request(
-            Request.from_url(next_page_url, label="LIST"))
-    
-        Actor.log.info("Adding {} to queue".format(next_page_url))
 
 
 async def process_request(queue, pw, proxy_info, request, semaphore):
@@ -92,36 +57,41 @@ async def process_request(queue, pw, proxy_info, request, semaphore):
                 }
         )
         page = await context.new_page()
-        reader_friendly_url = AmazonProduct.fix_url(request.url)
         try:
             await page.route("**/*", block_images)          
             await page.goto(request.url, timeout=REQUEST_TIMEOUT, 
                             wait_until="domcontentloaded")
-            
             label = request.label
-
             if label == "LIST":
                 await handle_list_page(page, queue)
 
             elif label == "PRODUCT":
                 await handle_product_page(page, request.url)
-
             await queue.mark_request_as_handled(request)
-            Actor.log.info("✅ Successfully processed request: {}".format(request.url))
+            Actor.log.info("✅ Successfully processed request: {}"
+                           .format(request.url))
 
-        except Exception as e:
-            Actor.log.error(e)
+        except (TimeoutError, playwright_error) as e: 
+            # Catch timeout & Playwright errors
             retries = request.user_data.get("retries", 0)
-            Actor.log.warning(f"Error on {reader_friendly_url} (attempt {retries + 1}): {e}")
-            
+            Actor.log.warning("Error on {} (attempt {}): {}"
+                              .format(request.url, retries + 1, e))
             if retries < 2:
                 request.user_data["retries"] = retries + 1
-                Actor.log.info(f"Retrying {reader_friendly_url} (retry {retries + 1})")                
+                Actor.log.info("Retrying {} (retry {})"
+                               .format(request.url, retries + 1))
                 await asyncio.sleep(1)
                 await queue.reclaim_request(request)
- 
             else:
-                Actor.log.error(f"❌ Failed permanently: {reader_friendly_url} after {retries + 1} attempts")
+                await queue.mark_request_as_handled(request)
+                Actor.log.error("❌ Failed permanently: {} after {} attempts"
+                                .format(request.url, retries + 1))
+
+        except Exception as e:
+            # All other errors will fall under here
+            await queue.mark_request_as_handled(request) # Don't bother with a re-try
+            Actor.log.error("❌ Failed permanently: {} {}"
+                            .format(request.url, e))            
 
         finally:
             await page.close()
@@ -129,21 +99,17 @@ async def process_request(queue, pw, proxy_info, request, semaphore):
             await browser.close()
 
 
-
 async def get_new_proxy(proxy_info):
     """
-    
+        return dict
     """
     proxy_url = await proxy_info.new_url()
-
     parsed = urlparse(proxy_url)
-
-    proxy_server = f"{parsed.scheme}://{parsed.hostname}:{parsed.port}"
-    #proxy_server = proxy_url
-    proxy_username = parsed.username
-    proxy_password = parsed.password
-
-    return (proxy_server, proxy_username, proxy_password)
+    return {
+        "server": f"{parsed.scheme}://{parsed.hostname}:{parsed.port}",
+        "username": parsed.username,
+        "password": parsed.password,
+    }
 
 
 async def get_new_browser(pw, proxy_info):
@@ -151,9 +117,7 @@ async def get_new_browser(pw, proxy_info):
 
     """
     (proxy_server, proxy_username, proxy_password) = await get_new_proxy(proxy_info)
-    #browser = await pw.chromium.launch(headless=False, proxy={"server": proxy_server, 
-    #                                                          "username": proxy_username, 
-    #                                                          "password": proxy_password})
+    #browser = await pw.chromium.launch(headless=False, proxy=get_new_proxy(proxy_info))
     browser = await pw.chromium.launch(headless=False)
     return browser
 
@@ -163,15 +127,20 @@ async def main():
 
     """
     idle_cycles = 0
-    semaphore = asyncio.Semaphore(2)
+    semaphore = asyncio.Semaphore(SEMAPHORE_CONCURRENCY)
 
     async with Actor:
         queue = await RequestQueue.open()
-        proxy_info = await Actor.create_proxy_configuration(groups=["RESIDENTIAL"], country_code='US')        
+        proxy_info = await Actor.create_proxy_configuration(
+            groups=["RESIDENTIAL"], country_code='US')        
+        actor_input = await Actor.get_input() or {}
+        start_list_url = actor_input.get('url')
 
+        if start_list_url is None:
+            Actor.log.error("Please enter a product list url from Amazon")
+            raise Exception("No Start Url found")
 
-
-        r = Request.from_url(url="https://www.amazon.com/s?k=cooker&_encoding=UTF8", label="LIST")
+        r = Request.from_url(url=start_list_url, label="LIST")
         add_request_info = await queue.add_request(r)
         Actor.log.info(f'Add request info: {add_request_info}')
  
@@ -192,19 +161,15 @@ async def main():
                 else:
                     idle_cycles = 0
 
-                #Actor.log.info(f'Processing request from Queue: {AmazonProduct.fix_url(request.url)}')
-
                 task = asyncio.create_task(
-                    process_request(queue, 
+                    process_request(queue,
                                     pw,
                                     proxy_info,
-                                    request, 
+                                    request,
                                     semaphore)
                 )
                 tasks.append(task)
 
-
             # Wait for any remaining tasks
             if tasks:
                 await asyncio.gather(*tasks)
-            

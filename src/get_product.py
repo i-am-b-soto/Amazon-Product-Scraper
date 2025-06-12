@@ -1,7 +1,5 @@
-#import random
 from bs4 import BeautifulSoup
 from .AmazonProduct import AmazonProduct
-#from .selenium_behavior import wait_for_product_page_load, human_action
 
 
 def get_type_of_product_page(soup):
@@ -102,8 +100,8 @@ async def get_product(page, product_url):
         Given a list of items, either from a search result or category, return a representation of 
             an Amazon product. Or None if the page couldn't be accessed
     """
-    await page.locator("h1#title").wait_for(state="visible", 
-                                            timeout=6000)       
+    await page.wait_for_selector("h1#title", timeout=6000,
+                                 state="visible")
 
     html = await page.content()
     
