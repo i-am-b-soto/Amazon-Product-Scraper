@@ -32,7 +32,7 @@ def get_price_regular(soup):
         pass
         #print("Decimal number does not exist")
     
-    return "{}{}".format(whole_number, decimal_number)
+    return "{}.{}".format(whole_number, decimal_number)
 
 
 def get_description_regular(soup):

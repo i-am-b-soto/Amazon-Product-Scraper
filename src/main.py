@@ -21,6 +21,23 @@ NON_ALLOWED_RESOURCE_TYPES = {"png", "jpg", "jpeg"}
 # CONTEXTS = [] # Global list of contexts
 # BROWSERS = []
 
+banned_domains = ["m.media-amazon.com", "images-na.ssl-images-amazon.com"]
+
+
+async def block_images(route, request):
+    if route.request.resource_type == "image":
+        #print(f"Blocking image: {route.request.url}")
+        await route.abort()
+    else:
+        l = False
+        for domain in banned_domains:
+            if request.url.find(domain) != -1:
+                await route.abort()
+                l = True
+        else:
+            if not l:
+                await route.continue_()
+
 
 async def handle_product_page(page, product_url):
     """
@@ -51,13 +68,6 @@ async def handle_list_page(page, queue):
         Actor.log.info("Adding {} to queue".format(next_page_url))
 
 
-def block_unnecessary_resources(route, request):
-    if request.resource_type in NON_ALLOWED_RESOURCE_TYPES:
-        route.abort()
-    else:
-        route.continue_()
-
-
 async def process_request(queue, pw, proxy_info, request, semaphore):
     """
         Process a request from the queue
@@ -84,7 +94,7 @@ async def process_request(queue, pw, proxy_info, request, semaphore):
         page = await context.new_page()
         reader_friendly_url = AmazonProduct.fix_url(request.url)
         try:
-            await page.route("**/*.{png,jpg,jpeg}", lambda route: route.abort())          
+            await page.route("**/*", block_images)          
             await page.goto(request.url, timeout=REQUEST_TIMEOUT, 
                             wait_until="domcontentloaded")
             
@@ -141,10 +151,10 @@ async def get_new_browser(pw, proxy_info):
 
     """
     (proxy_server, proxy_username, proxy_password) = await get_new_proxy(proxy_info)
-    browser = await pw.chromium.launch(headless=False, proxy={"server": proxy_server, 
-                                                              "username": proxy_username, 
-                                                              "password": proxy_password})
-    #browser = await pw.chromium.launch(headless=False)
+    #browser = await pw.chromium.launch(headless=False, proxy={"server": proxy_server, 
+    #                                                          "username": proxy_username, 
+    #                                                          "password": proxy_password})
+    browser = await pw.chromium.launch(headless=False)
     return browser
 
 
@@ -164,7 +174,7 @@ async def main():
         r = Request.from_url(url="https://www.amazon.com/s?k=cooker&_encoding=UTF8", label="LIST")
         add_request_info = await queue.add_request(r)
         Actor.log.info(f'Add request info: {add_request_info}')
-
+ 
         async with async_playwright() as pw:
             tasks = []
 
