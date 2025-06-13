@@ -1,4 +1,5 @@
 import asyncio
+import time
 from apify import Actor
 from crawlee import Request
 from apify.storages import RequestQueue
@@ -6,7 +7,7 @@ from urllib.parse import urlparse
 
 from playwright.async_api import async_playwright
 from playwright.async_api import TimeoutError, Error as playwright_error
-from request_handlers import handle_product_page, handle_list_page
+from .request_handlers import handle_product_page, handle_list_page
 
 
 SEMAPHORE_CONCURRENCY = 8
@@ -38,6 +39,7 @@ async def process_request(queue, pw, proxy_info, request, semaphore):
         Process a request from the queue
     """
     async with semaphore:
+        #start_time = time.time()
         browser = await get_new_browser(pw, proxy_info)
         context = await browser.new_context(user_agent=(
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -56,6 +58,8 @@ async def process_request(queue, pw, proxy_info, request, semaphore):
                     "Sec-Fetch-Dest": "document",
                 }
         )
+        #end_time = time.time()
+        #print("Total tiem elapsed creating the browser and context: {}". format(end_time - start_time))
         page = await context.new_page()
         try:
             await page.route("**/*", block_images)          
