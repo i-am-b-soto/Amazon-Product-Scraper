@@ -80,7 +80,6 @@ def scrape_regular_product(soup, product_url):
     return p
 
 
-
 def scrape_product(html, product_url):
     """
 
@@ -101,7 +100,7 @@ async def get_product(page, product_url):
             an Amazon product. Or None if the page couldn't be accessed
     """
     await page.locator("h1#title").wait_for(state="visible", 
-                                            timeout=5000)       
+                                            timeout=5000)    
 
     html = await page.content()
     

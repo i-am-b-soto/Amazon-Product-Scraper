@@ -1,7 +1,4 @@
-#import random
 from bs4 import BeautifulSoup
-#from .selenium_behavior import wait_for_list_page_load, human_action
-#from .project_globals import FIRST_LIST_PAGE_LOADED
 
 
 def get_next_page_url(html):
@@ -22,7 +19,8 @@ def get_next_page_url(html):
 
 def what_type_of_list(soup):
     """
-        Determine what type of list the product list page is (currently identified 2 types - Grid and row)
+        Determine what type of list the product list page is (currently 
+        identified 2 types - Grid and row)
     """
     list_items = soup.find_all("div", attrs={"role": "listitem"})
 
@@ -103,8 +101,12 @@ def scrape_list_page(html):
 
 async def get_product_urls(page):
     """
-        Given a list of items, either from a search result or category, return a list of all dem urls
+        Given a list of items, either from a search result or category, 
+        return a list of all dem urls
     """
+
+    await page.locator('div[role="list_item"]').wait_for(state="visible", 
+                                                         timeout=30000)
 
     html = await page.content()
 
@@ -117,4 +119,3 @@ async def get_product_urls(page):
 
 if __name__ == "__main__":
     pass
-    
