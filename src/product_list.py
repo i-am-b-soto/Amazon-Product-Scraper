@@ -105,7 +105,8 @@ async def get_product_urls(page):
     """
         Given a list of items, either from a search result or category, return a list of all dem urls
     """
-
+    await page.locator('div[role="list_item"]').wait_for(state="visible", 
+                                                         timeout=30000)
     html = await page.content()
 
     product_urls = scrape_list_page(html)
