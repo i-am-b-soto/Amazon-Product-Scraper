@@ -124,7 +124,7 @@ async def main():
             Actor.log.error("Please enter a product list url from Amazon")
             raise Exception("No product list url found")
 
-        r = Request.from_url(url="https://www.amazon.com/s?k=cooker&page=2", label="LIST")
+        r = Request.from_url(url="https://www.amazon.com/s?k=home+storage&_encoding=UTF8", label="LIST")
         add_request_info = await queue.add_request(r)
         Actor.log.info(f'Seeding Queue with: {add_request_info}')
  

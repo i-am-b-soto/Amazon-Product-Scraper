@@ -32,9 +32,10 @@ class BrowserWrapper:
         """
 
         """
-        (proxy_server,
-         proxy_username,
-         proxy_password) = await ProxyManager.get_new_proxy(proxy_info)
+        #proxy_dict = await ProxyManager.get_new_proxy(proxy_info)
+        #browser = await playwright.chromium.launch(headless=False, 
+        #                                           proxy=proxy_dict)
+
         browser = await playwright.chromium.launch(headless=False)
         return browser
 
