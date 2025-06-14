@@ -4,11 +4,12 @@ from urllib.parse import urlparse
 
 class ProxyManager:
     @staticmethod
-    async def make_residential_proxy_info():
-        #proxy_info = await Actor.create_proxy_configuration(
-        #            groups=["RESIDENTIAL"], country_code='US')
-        proxy_info = await Actor.create_proxy_configuration(country_code='US')
-        
+    async def make_proxy_info(use_resedential_proxies=False):
+        if use_resedential_proxies:
+            proxy_info = await Actor.create_proxy_configuration(
+                        groups=["RESIDENTIAL"], country_code='US')
+        else:
+            proxy_info = await Actor.create_proxy_configuration(country_code='US')
         return proxy_info
 
     @staticmethod

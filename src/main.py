@@ -42,7 +42,6 @@ async def process_request(queue, browser_pool, request, semaphore):
     """
         Process a request from the queue
     """
-    #await asyncio.sleep(random.uniform(1, 5))
     async with semaphore:
         browser_wrapper = await browser_pool.get_next_browser()
         await browser_wrapper.enter_lock()
@@ -51,7 +50,7 @@ async def process_request(queue, browser_pool, request, semaphore):
         context = await browser.new_context(
             user_agent=context_config["user_agent"],
             locale=context_config["locale"],
-            viewport={"width": 1280, "height": 800},
+            viewport=context_config["viewport"],
             is_mobile=False,
             java_script_enabled=True,
             extra_http_headers={
@@ -117,22 +116,21 @@ async def main():
     async with Actor:
         queue = await RequestQueue.open()
         actor_input = await Actor.get_input() or {}
-        start_list_url = actor_input.get('url')
+        start_list_url = actor_input.get('product_list_url', None)
 
         if start_list_url is None:
-            Actor.log.error("Please enter a product list url from Amazon")
-            raise Exception("No product list url found")
+            await Actor.fail("No product list url found")
 
-        r = Request.from_url(url="https://www.amazon.com/s?k=home+storage&_encoding=UTF8", label="LIST")
+        r = Request.from_url(url=start_list_url, label="LIST")
         add_request_info = await queue.add_request(r)
-        Actor.log.info(f'Seeding Queue with: {add_request_info}')
+        Actor.log.info(f'Seeding Queue with url: {add_request_info}')
  
         async with async_playwright() as pw:
             tasks = []
-
-            res_proxy_info = await ProxyManager.make_residential_proxy_info()
+            use_res_proxies = actor_input.get("use_resedential_proxies", False)
+            proxy_info = await ProxyManager.make_proxy_info(use_res_proxies)
             bp = BrowserPool(num_browsers=10, playwright=pw, 
-                             proxy_info=res_proxy_info)
+                             proxy_info=proxy_info)
             await bp.populate()
 
             while not await queue.is_finished():

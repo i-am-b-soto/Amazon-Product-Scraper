@@ -3,12 +3,18 @@
     "type": "object",
     "schemaVersion": 1,
     "properties": {
-        "url": {
+        "product_list_url": {
             "title": "Product list URL to start",
             "type": "string",
             "description": "The URL of website you want to get the data from.",
             "editor": "textfield",
             "prefill": "https://www.amazon.com/s?k=cooker&page=2"
+        },
+        "use_resedential_proxies": {
+            "title": "Use Resedential Proxies?",
+            "type": "boolean",
+            "description": "Use Resedential Proxies to perform this scrape? Results in hire success rate but more costly.",
+            "default": false
         }
     },
     "required": ["url"]
