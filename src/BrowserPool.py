@@ -32,11 +32,11 @@ class BrowserWrapper:
         """
 
         """
-        #proxy_dict = await ProxyManager.get_new_proxy(proxy_info)
-        #browser = await playwright.chromium.launch(headless=False, 
-        #                                           proxy=proxy_dict)
+        proxy_dict = await ProxyManager.get_new_proxy(proxy_info)
+        browser = await playwright.chromium.launch(headless=False, 
+                                                   proxy=proxy_dict)
 
-        browser = await playwright.chromium.launch(headless=False)
+        #browser = await playwright.chromium.launch(headless=False)
         return browser
 
 
@@ -76,16 +76,16 @@ class BrowserPool:
                 if cur_cycle > max_cyles:
                     raise Exception("Browser Pool waited too long for an open browser")
                 cur_count = 0
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.5)
+            
+            if self.browser_pool[self.current_index % self.num_browsers].lock.locked():
+                self.current_index += 1
+                cur_count += 1
             else:
-                if self.browser_pool[self.current_index % self.num_browsers].lock.locked():
-                    self.current_index += 1
-                    cur_count += 1
-                else:
-                    bw = self.browser_pool[self.current_index]
-                    print("Returning wrapper at index: {}".format(self.current_index))
-                    self.current_index += 1
-                    return bw
+                bw = self.browser_pool[self.current_index % self.num_browsers]
+                print("Returning wrapper at index: {}".format(self.current_index))
+                self.current_index += 1
+                return bw
 
     async def handle_no_response(self, browser_wrapper):
         """

@@ -1,4 +1,5 @@
 from bs4 import BeautifulSoup
+from .custom_exceptions import ProductListPageNotLoaded
 
 
 def get_next_page_url(html):
@@ -27,7 +28,7 @@ def what_type_of_list(soup):
     if len(list_items) > 0:
         li = list_items[0]
     else:
-        raise Exception("Can't determine type of product list page") 
+        raise ProductListPageNotLoaded("Can't determine type of product list page") 
 
     if li.find("div", class_="puis-card-container"):
         return "rows"
@@ -105,8 +106,8 @@ async def get_product_urls(page):
         return a list of all dem urls
     """
 
-    await page.locator('div[role="list_item"]').wait_for(state="visible", 
-                                                         timeout=30000)
+    #await page.locator('div[role="list_item"]').wait_for(state="visible", 
+    #                                                     timeout=30000)
 
     html = await page.content()
 

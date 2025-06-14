@@ -1,4 +1,5 @@
 import asyncio
+import random
 from apify import Actor
 from crawlee import Request
 from apify.storages import RequestQueue
@@ -8,6 +9,8 @@ from playwright.async_api import TimeoutError, Error as playwright_error
 from .request_handlers import handle_product_page, handle_list_page
 from .ProxyManager import ProxyManager
 from .BrowserPool import BrowserPool
+from .browser_contexts import browser_contexts
+from .custom_exceptions import ProductListPageNotLoaded
 
 
 SEMAPHORE_CONCURRENCY = 8
@@ -39,28 +42,23 @@ async def process_request(queue, browser_pool, request, semaphore):
     """
         Process a request from the queue
     """
+    #await asyncio.sleep(random.uniform(1, 5))
     async with semaphore:
         browser_wrapper = await browser_pool.get_next_browser()
         await browser_wrapper.enter_lock()
         browser = browser_wrapper.get_browser()
-        context = await browser.new_context(user_agent=(
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/122.0.0.0 Safari/537.36"
-                ),
-                locale="en-US",
-                viewport={"width": 1420, "height": 800},
-                is_mobile=False,
-                extra_http_headers={
-                    "Accept-Language": "en-US,en;q=0.9",
-                    "Upgrade-Insecure-Requests": "1",
-                    "Sec-Fetch-Site": "none",
-                    "Sec-Fetch-Mode": "navigate",
-                    "Sec-Fetch-User": "?1",
-                    "Sec-Fetch-Dest": "document",
-                }
+        context_config = random.choice(browser_contexts)
+        context = await browser.new_context(
+            user_agent=context_config["user_agent"],
+            locale=context_config["locale"],
+            viewport={"width": 1280, "height": 800},
+            is_mobile=False,
+            java_script_enabled=True,
+            extra_http_headers={
+                "Accept-Language": "en-US,en;q=0.9",
+                "Referer": "https://www.google.com/"
+            }
         )
-        print(context)
         page = await context.new_page()
         try:
             await page.route("**/*", block_images)          
@@ -72,11 +70,12 @@ async def process_request(queue, browser_pool, request, semaphore):
 
             elif label == "PRODUCT":
                 await handle_product_page(page, request.url)
+            
             await queue.mark_request_as_handled(request)
             Actor.log.info("✅ Successfully processed request: {}"
                         .format(request.url))
 
-        except (TimeoutError, playwright_error) as e: 
+        except (TimeoutError, playwright_error, ProductListPageNotLoaded) as e: 
             # Catch timeout & Playwright errors
             retries = request.user_data.get("retries", 0)
             Actor.log.warning("Error on {} (attempt {}): {}"

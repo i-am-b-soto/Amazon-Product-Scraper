@@ -5,8 +5,9 @@ from urllib.parse import urlparse
 class ProxyManager:
     @staticmethod
     async def make_residential_proxy_info():
-        proxy_info = await Actor.create_proxy_configuration(
-                    groups=["RESIDENTIAL"], country_code='US')
+        #proxy_info = await Actor.create_proxy_configuration(
+        #            groups=["RESIDENTIAL"], country_code='US')
+        proxy_info = await Actor.create_proxy_configuration(country_code='US')
         
         return proxy_info
 
