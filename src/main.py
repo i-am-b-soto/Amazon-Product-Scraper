@@ -20,7 +20,6 @@ BANNED_DOMAINS = ["media-amazon.com", "ssl-images-amazon.com",
                   "amazon-adsystem.com"]
 
 
-
 async def block_images(route, request):
     """
 

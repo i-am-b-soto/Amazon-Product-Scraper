@@ -83,7 +83,7 @@ class BrowserPool:
                 cur_count += 1
             else:
                 bw = self.browser_pool[self.current_index % self.num_browsers]
-                print("Returning wrapper at index: {}".format(self.current_index))
+                #print("Returning wrapper at index: {}".format(self.current_index))
                 self.current_index += 1
                 return bw
 
