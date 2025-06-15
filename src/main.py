@@ -38,7 +38,7 @@ async def block_images(route, request):
                 await route.continue_()
 
 
-async def process_request(queue, bwp, request, semaphore):
+async def process_request(queue, bwp, request, semaphore, add_human_behavior):
     """
         Process a request from the queue
     """
@@ -54,10 +54,10 @@ async def process_request(queue, bwp, request, semaphore):
                             wait_until="domcontentloaded")
             label = request.label
             if label == "LIST":
-                await handle_list_page(page, queue)
+                await handle_list_page(page, queue, add_human_behavior)
 
             elif label == "PRODUCT":
-                await handle_product_page(page, request.url)
+                await handle_product_page(page, request.url, add_human_behavior)
             
             await queue.mark_request_as_handled(request)
             Actor.log.info("✅ Successfully processed request: {}"
@@ -103,13 +103,27 @@ async def main():
 
         queue = await RequestQueue.open()
         actor_input = await Actor.get_input() or {}
+
         start_list_url = actor_input.get('product_list_url', None)
-        semaphore_count = actor_input.get('semaphore_count', 5)
-        browser_count = actor_input.get('browser_count', 5)
+        #advanced_input = actor_input.get('advanced')
+
+        semaphore_count = actor_input.get('parallel_worker_count', 5)
+        browser_context_count = actor_input.get('browser_context_count', 5)
+
+        add_human_behvaior = actor_input.get('add_human_behavior', False)
+        request_timeout = actor_input.get('request_timeout')
+
+        global REQUEST_TIMEOUT
+        REQUEST_TIMEOUT = request_timeout
+
         semaphore = asyncio.Semaphore(semaphore_count)
 
         if start_list_url is None:
             await Actor.fail("No product list url found")
+
+        if browser_context_count < semaphore_count:
+            await Actor.fail("Number of browser contexts should not be less " \
+            "than number of parallel workers")
 
         r = Request.from_url(url=start_list_url, label="LIST")
         add_request_info = await queue.add_request(r)
@@ -119,8 +133,9 @@ async def main():
             tasks = []
             use_res_proxies = actor_input.get("use_resedential_proxies", False)
             proxy_info = await ProxyManager.make_proxy_info(use_res_proxies)
-            bwp = BrowserWrapperPool(num_browsers=browser_count, playwright=pw, 
-                             proxy_info=proxy_info)
+            bwp = BrowserWrapperPool(num_browsers=browser_context_count, 
+                                     playwright=pw, 
+                                     proxy_info=proxy_info)
             await bwp.populate()
 
             while not await queue.is_finished():
@@ -141,7 +156,8 @@ async def main():
                     process_request(queue,
                                     bwp,
                                     request,
-                                    semaphore)
+                                    semaphore,
+                                    add_human_behvaior)
                 )
                 tasks.append(task)
 

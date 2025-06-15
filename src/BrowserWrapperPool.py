@@ -126,11 +126,12 @@ class BrowserWrapperPool:
                 it
         """
         browser_wrapper.update_failure_count()
+
         failure_count = browser_wrapper.get_failure_count()
 
         if failure_count >= 3:
             
-            new_browser_wrapper = BrowserWrapper(browser_wrapper.index, 
+            new_browser_wrapper = BrowserWrapper(browser_wrapper.index,
                                                  create_session_id())
             
             # I'ts time to punish this browser

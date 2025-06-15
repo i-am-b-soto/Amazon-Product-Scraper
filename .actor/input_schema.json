@@ -1,5 +1,5 @@
 {
-    "title": "Scrape data from a web page",
+    "title": "Amazon Product Scraper Made With Love",
     "type": "object",
     "schemaVersion": 1,
     "properties": {
@@ -10,26 +10,42 @@
             "editor": "textfield",
             "prefill": "https://www.amazon.com/s?k=cooker&page=2"
         },
+
         "use_resedential_proxies": {
             "title": "Use Resedential Proxies?",
             "type": "boolean",
-            "description": "Use Resedential Proxies to perform this scrape? Results in hire success rate but more costly.",
+            "description": "Use Resedential Proxies to perform this scrape? Decreases risk for bot detection but potentially increases cost.",
             "default": false
         },
-        "semaphore_count": {
-            "title": "Semaphore Count",
+        "add_human_behavior": {
+            "title": "Add human-like behavior to requests made?",
+            "type": "boolean",
+            "description": "Add human-like behavior to requests made. Decreases risk for bot detection but risks the program running slower.",
+            "default": true
+
+        },
+        "parallel_worker_count": {
+            "title": "Parallel Worker Count",
             "type": "integer",
             "default": 5,
             "minimum": 1,
-            "description": "Maximum number of concurrent requests (used with async semaphores)"
-          },
-          "browser_count": {
-            "title": "Browser Count",
+            "description": "Maximum number of concurrent requests (higher numbers require more cpu)"
+
+        },
+        "browser_context_count": {
+            "title": "Browser Context Count",
             "type": "integer",
             "default": 5,
             "minimum": 1,
-            "description": "Number of browser instances to run in parallel"
-          }
-    },
-    "required": ["product_list_url"]
+            "description": "Total number of browser context instances to store in memory (should not be lower than parallel worker count)"
+        },
+        "request_timeout":{
+            "title": "Global Request Timeout",
+            "type": "integer",
+            "default": 12000,
+            "minimum": 3000,
+            "description": "Time in ms to wait for each request before failing."
+        }
+    },  
+    "required":["product_list_url"]
 }
