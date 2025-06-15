@@ -1,5 +1,4 @@
 import asyncio
-import random
 from apify import Actor
 from crawlee import Request
 from apify.storages import RequestQueue
@@ -8,7 +7,7 @@ from playwright.async_api import TimeoutError, Error as playwright_error
 
 from .request_handlers import handle_product_page, handle_list_page
 from .ProxyManager import ProxyManager
-from .BrowserPool import BrowserPool
+from .BrowserWrapperPool import BrowserWrapperPool, BrowserWrapper
 from .browser_contexts import browser_contexts
 from .custom_exceptions import ProductListPageNotLoaded
 from .print_stats import print_stats
@@ -39,27 +38,16 @@ async def block_images(route, request):
                 await route.continue_()
 
 
-async def process_request(queue, browser_pool, request, semaphore):
+async def process_request(queue, bwp, request, semaphore):
     """
         Process a request from the queue
     """
     async with semaphore:
-        browser_wrapper = await browser_pool.get_next_browser()
-        await browser_wrapper.enter_lock()
-        browser = browser_wrapper.get_browser()
-     
-        context_config = random.choice(browser_contexts)
-        context = await browser.new_context(
-            user_agent=context_config["user_agent"],
-            locale=context_config["locale"],
-            viewport=context_config["viewport"],
-            is_mobile=False,
-            java_script_enabled=True,
-            extra_http_headers={
-                "Accept-Language": "en-US,en;q=0.9"
-            }
-        )
+        bw = await bwp.get_next_browser_context()
+        await bw.enter_lock()
+        context = bw.get_context() 
         page = await context.new_page()
+
         try:
             await page.route("**/*", block_images)          
             await page.goto(request.url, timeout=REQUEST_TIMEOUT,
@@ -81,7 +69,7 @@ async def process_request(queue, browser_pool, request, semaphore):
             Actor.log.warning("Error on {} (attempt {}): {}"
                             .format(request.url, retries + 1, e))
             
-            await browser_pool.handle_no_response(browser_wrapper)
+            await bwp.handle_no_response(bw)
 
             if retries < 2:
                 request.user_data["retries"] = retries + 1
@@ -103,8 +91,7 @@ async def process_request(queue, browser_pool, request, semaphore):
 
         finally:
             await page.close()
-            await context.close()
-            await browser_wrapper.exit_lock()
+            await bw.exit_lock()
 
 
 async def main():
@@ -132,9 +119,9 @@ async def main():
             tasks = []
             use_res_proxies = actor_input.get("use_resedential_proxies", False)
             proxy_info = await ProxyManager.make_proxy_info(use_res_proxies)
-            bp = BrowserPool(num_browsers=browser_count, playwright=pw, 
+            bwp = BrowserWrapperPool(num_browsers=browser_count, playwright=pw, 
                              proxy_info=proxy_info)
-            await bp.populate()
+            await bwp.populate()
 
             while not await queue.is_finished():
                 request = await queue.fetch_next_request()
@@ -152,7 +139,7 @@ async def main():
 
                 task = asyncio.create_task(
                     process_request(queue,
-                                    bp,
+                                    bwp,
                                     request,
                                     semaphore)
                 )
@@ -162,4 +149,4 @@ async def main():
             if tasks:
                 await asyncio.gather(*tasks)
             
-            await bp.destroy()
+            await bwp.destroy()

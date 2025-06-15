@@ -10,13 +10,14 @@ from src.browser_contexts import browser_contexts
 async def test():
     async with Actor:    
         async with async_playwright() as pw:
+            proxy_info = await ProxyManager.make_proxy_info(False)
+            proxy_stats = await ProxyManager.get_new_proxy(proxy_info, session_id=None)
+            print(proxy_stats["server"])
+            browser = await pw.chromium.launch(headless=True, 
+                                                    proxy=proxy_stats)
+                            
             for _ in range(5):
-                proxy_info = await ProxyManager.make_proxy_info(True)
-                proxy_stats = await ProxyManager.get_new_proxy(proxy_info)
 
-                browser = await pw.chromium.launch(headless=True, 
-                                                        proxy=proxy_stats)
-                
                 context_config = random.choice(browser_contexts)
                 context = await browser.new_context(
                     user_agent=context_config["user_agent"],
@@ -36,8 +37,8 @@ async def test():
                 content = await page.content()
                 print(content)
 
-                page.close()
-                context.close()
-                browser.close()
+                await page.close()
+                await context.close()
+            await browser.close()
     
 asyncio.run(test())
