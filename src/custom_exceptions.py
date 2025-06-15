@@ -1,4 +1,4 @@
 class ProductListPageNotLoaded(Exception):
-    def __init__(self, message, errors):            
+    def __init__(self, message):            
         super().__init__(message)
-        self.errors = errors
+        #self.errors = errors

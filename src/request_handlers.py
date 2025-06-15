@@ -1,9 +1,10 @@
+import random
 from apify import Actor
 from crawlee import Request
 from .product_list import get_product_urls
 from .get_product import get_product
 from .AmazonProduct import AmazonProduct
-
+from .user_behavior import perform_random_user_behavior, human_scroll
 
 async def handle_product_page(page, product_url):
     """
@@ -11,6 +12,8 @@ async def handle_product_page(page, product_url):
     """
     product = await get_product(page, product_url)
     await Actor.push_data(product.to_json())
+
+    await perform_random_user_behavior(page)
 
 
 async def handle_list_page(page, queue):
@@ -31,4 +34,6 @@ async def handle_list_page(page, queue):
         await queue.add_request(
             Request.from_url(next_page_url, label="LIST"))
     
-        Actor.log.info("Adding {} to queue".format(next_page_url))
+        Actor.log.info("Adding List page: {} to queue".format(next_page_url))
+    
+        await human_scroll(page)

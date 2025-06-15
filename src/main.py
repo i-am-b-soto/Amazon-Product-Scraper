@@ -3,17 +3,19 @@ import random
 from apify import Actor
 from crawlee import Request
 from apify.storages import RequestQueue
-
 from playwright.async_api import async_playwright
 from playwright.async_api import TimeoutError, Error as playwright_error
+
 from .request_handlers import handle_product_page, handle_list_page
 from .ProxyManager import ProxyManager
 from .BrowserPool import BrowserPool
 from .browser_contexts import browser_contexts
 from .custom_exceptions import ProductListPageNotLoaded
+from .print_stats import print_stats
 
 
-SEMAPHORE_CONCURRENCY = 8
+SEMAPHORE_CONCURRENCY = 3
+NUM_BROWSERS = 4
 MAX_IDLE_CYCLES = 120
 REQUEST_TIMEOUT = 12000
 BANNED_DOMAINS = ["media-amazon.com", "ssl-images-amazon.com", 
@@ -45,6 +47,7 @@ async def process_request(queue, browser_pool, request, semaphore):
         browser_wrapper = await browser_pool.get_next_browser()
         await browser_wrapper.enter_lock()
         browser = browser_wrapper.get_browser()
+     
         context_config = random.choice(browser_contexts)
         context = await browser.new_context(
             user_agent=context_config["user_agent"],
@@ -53,8 +56,7 @@ async def process_request(queue, browser_pool, request, semaphore):
             is_mobile=False,
             java_script_enabled=True,
             extra_http_headers={
-                "Accept-Language": "en-US,en;q=0.9",
-                "Referer": "https://www.google.com/"
+                "Accept-Language": "en-US,en;q=0.9"
             }
         )
         page = await context.new_page()
@@ -86,7 +88,7 @@ async def process_request(queue, browser_pool, request, semaphore):
                 Actor.log.info("Retrying {} (retry {})"
                             .format(request.url, retries + 1))
                 await asyncio.sleep(0.5)
-                await queue.reclaim_request(request)
+                await queue.reclaim_request(request, forefront=False)
             
             else:
                 await queue.mark_request_as_handled(request)
@@ -102,20 +104,22 @@ async def process_request(queue, browser_pool, request, semaphore):
         finally:
             await page.close()
             await context.close()
-            browser_wrapper.exit_lock()
+            await browser_wrapper.exit_lock()
 
 
 async def main():
     """
 
     """
-    idle_cycles = 0
-    semaphore = asyncio.Semaphore(SEMAPHORE_CONCURRENCY)
-
     async with Actor:
+        idle_cycles = 0
+
         queue = await RequestQueue.open()
         actor_input = await Actor.get_input() or {}
         start_list_url = actor_input.get('product_list_url', None)
+        semaphore_count = actor_input.get('semaphore_count', 5)
+        browser_count = actor_input.get('browser_count', 5)
+        semaphore = asyncio.Semaphore(semaphore_count)
 
         if start_list_url is None:
             await Actor.fail("No product list url found")
@@ -128,7 +132,7 @@ async def main():
             tasks = []
             use_res_proxies = actor_input.get("use_resedential_proxies", False)
             proxy_info = await ProxyManager.make_proxy_info(use_res_proxies)
-            bp = BrowserPool(num_browsers=10, playwright=pw, 
+            bp = BrowserPool(num_browsers=browser_count, playwright=pw, 
                              proxy_info=proxy_info)
             await bp.populate()
 
@@ -157,3 +161,5 @@ async def main():
             # Wait for any remaining tasks
             if tasks:
                 await asyncio.gather(*tasks)
+            
+            await bp.destroy()

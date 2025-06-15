@@ -28,13 +28,16 @@ class BrowserWrapper:
 
 
     @staticmethod
-    async def create_browser(playwright, proxy_info):
+    async def create_browser(playwright, proxy_info, no_proxy=False):
         """
 
         """
-        proxy_dict = await ProxyManager.get_new_proxy(proxy_info)
-        browser = await playwright.chromium.launch(headless=False, 
-                                                   proxy=proxy_dict)
+        if no_proxy:
+            browser = await playwright.chromium.launch(headless=True)
+        else:
+            proxy_dict = await ProxyManager.get_new_proxy(proxy_info)
+            browser = await playwright.chromium.launch(headless=True, 
+                                                    proxy=proxy_dict)
 
         #browser = await playwright.chromium.launch(headless=False)
         return browser
@@ -44,20 +47,24 @@ class BrowserPool:
     """
 
     """
-    def __init__(self, num_browsers, playwright, proxy_info):
+    def __init__(self, num_browsers, playwright, 
+                 proxy_info=None, run_without_proxy=False):
         self.num_browsers = num_browsers
         self.proxy_info = proxy_info
         self.playwright = playwright
         self.browser_pool = []
         self.current_index = 0
+        self.run_without_proxy = run_without_proxy
 
     async def populate(self):
         """
             Populate browserPool with new browser wrappers
         """
         for i in range(self.num_browsers):
+
             browser = await BrowserWrapper.create_browser(self.playwright, 
-                                                    self.proxy_info)
+                                                    self.proxy_info, 
+                                                    self.run_without_proxy)
             
             browser_wrapper = BrowserWrapper(browser, i)
             self.browser_pool.append(browser_wrapper)
@@ -83,7 +90,6 @@ class BrowserPool:
                 cur_count += 1
             else:
                 bw = self.browser_pool[self.current_index % self.num_browsers]
-                #print("Returning wrapper at index: {}".format(self.current_index))
                 self.current_index += 1
                 return bw
 
@@ -104,6 +110,11 @@ class BrowserPool:
             new_browser_wrapper = BrowserWrapper(new_browser, 
                                                  browser_wrapper.index)
             self.browser_pool[browser_wrapper.index] = new_browser_wrapper
-            browser_wrapper.browser.close()
+            await browser_wrapper.browser.close()
 
             # let python deal with the garbage collection
+    
+    async def destroy(self):
+        for i in range(self.num_browsers):
+            browser = self.browser_pool[i].get_browser()
+            await browser.close()

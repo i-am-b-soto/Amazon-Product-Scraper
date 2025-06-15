@@ -6,7 +6,7 @@
         "product_list_url": {
             "title": "Product list URL to start",
             "type": "string",
-            "description": "The URL of website you want to get the data from.",
+            "description": "Enter the URL of the Amazon Product List Page you want to start scraping",
             "editor": "textfield",
             "prefill": "https://www.amazon.com/s?k=cooker&page=2"
         },
@@ -15,7 +15,21 @@
             "type": "boolean",
             "description": "Use Resedential Proxies to perform this scrape? Results in hire success rate but more costly.",
             "default": false
-        }
+        },
+        "semaphore_count": {
+            "title": "Semaphore Count",
+            "type": "integer",
+            "default": 5,
+            "minimum": 1,
+            "description": "Maximum number of concurrent requests (used with async semaphores)"
+          },
+          "browser_count": {
+            "title": "Browser Count",
+            "type": "integer",
+            "default": 5,
+            "minimum": 1,
+            "description": "Number of browser instances to run in parallel"
+          }
     },
-    "required": ["url"]
+    "required": ["product_list_url"]
 }
