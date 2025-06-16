@@ -1,5 +1,6 @@
 from bs4 import BeautifulSoup
 from .AmazonProduct import AmazonProduct
+from .custom_exceptions import ProductNotLoaded
 
 
 def get_type_of_product_page(soup):
@@ -60,8 +61,7 @@ def get_title_regular(soup):
             pass
             #print("No title span")
     else:
-        raise Exception("Cannot find title")
-        #print("No h1 title")
+        raise ProductNotLoaded("Cannot find title - likely product not loaded")
 
     return title
 
@@ -175,13 +175,11 @@ async def get_product(page, product_url):
             an Amazon product. Or None if the page couldn't be accessed
     """
     await page.locator("h1#title").wait_for(state="visible", 
-                                            timeout=5000)    
+                                            timeout=3000)    
 
     html = await page.content()
     
     p = scrape_product(html, product_url)
-
-    #human_action(driver, random.randint(0, 8))
 
     return p
 

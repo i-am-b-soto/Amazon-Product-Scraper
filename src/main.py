@@ -9,8 +9,8 @@ from .request_handlers import handle_product_page, handle_list_page
 from .ProxyManager import ProxyManager
 from .BrowserWrapperPool import BrowserWrapperPool, BrowserWrapper
 from .browser_contexts import browser_contexts
-from .custom_exceptions import ProductListPageNotLoaded
-from .print_stats import print_stats
+from .custom_exceptions import ProductListPageNotLoaded, ProductNotLoaded
+
 
 
 SEMAPHORE_CONCURRENCY = 3
@@ -50,7 +50,7 @@ async def process_request(queue, bwp, request, semaphore, add_human_behavior):
 
         try:
             await page.route("**/*", block_images)          
-            await page.goto(request.url, timeout=REQUEST_TIMEOUT)
+            await page.goto(request.url, wait_until="domcontentloaded", timeout=REQUEST_TIMEOUT)
             label = request.label
             if label == "LIST":
                 await handle_list_page(page, queue, add_human_behavior)
@@ -62,8 +62,9 @@ async def process_request(queue, bwp, request, semaphore, add_human_behavior):
             Actor.log.info("✅ Successfully processed request: {}"
                         .format(request.url))
 
-        except (TimeoutError, playwright_error, ProductListPageNotLoaded) as e: 
-            # Catch timeout & Playwright errors
+        except (TimeoutError, playwright_error, 
+                ProductListPageNotLoaded, ProductNotLoaded) as e: 
+            # Catch Timeout Errors
             retries = request.user_data.get("retries", 0)
             Actor.log.warning("Error on {} (attempt {}): {}"
                             .format(request.url, retries + 1, e))
@@ -110,6 +111,7 @@ async def main():
         browser_context_count = actor_input.get('browser_context_count', 5)
 
         add_human_behvaior = actor_input.get('add_human_behavior', False)
+        headless = actor_input.get("headless", True)
         request_timeout = actor_input.get('request_timeout')
 
         global REQUEST_TIMEOUT
@@ -134,7 +136,9 @@ async def main():
             proxy_info = await ProxyManager.make_proxy_info(use_res_proxies)
             bwp = BrowserWrapperPool(num_browsers=browser_context_count, 
                                      playwright=pw, 
-                                     proxy_info=proxy_info)
+                                     proxy_info=proxy_info,
+                                     headless=headless
+                                     )
             await bwp.populate()
 
             while not await queue.is_finished():

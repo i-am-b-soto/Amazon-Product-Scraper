@@ -42,16 +42,18 @@ class BrowserWrapper:
         if self.browser:
             await self.browser.close()
 
-    async def set_browser_context(self, playwright, proxy_info, no_proxy=False):
+    async def set_browser_context(self, playwright, proxy_info, 
+                                  no_proxy=False, headless=True):
         """
 
         """
         if no_proxy:
-            browser = await playwright.chromium.launch(headless=True)
+            browser = await playwright.chromium.launch(headless=headless)
         else:
             proxy_dict = await ProxyManager.get_new_proxy(proxy_info, 
                                                         session_id=self.session_id)
-            browser = await playwright.chromium.launch(headless=True, 
+            
+            browser = await playwright.chromium.launch(headless=headless, 
                                                     proxy=proxy_dict)
 
         context_config = random.choice(browser_contexts)
@@ -74,13 +76,14 @@ class BrowserWrapperPool:
 
     """
     def __init__(self, num_browsers, playwright, 
-                 proxy_info=None, run_without_proxy=False):
+                 proxy_info=None, run_without_proxy=False, headless=True):
         self.num_browsers = num_browsers
         self.proxy_info = proxy_info
         self.playwright = playwright
         self.browser_wrapper_pool = []
         self.current_index = 0
         self.run_without_proxy = run_without_proxy
+        self.headless = headless
 
     async def populate(self):
         """
@@ -92,7 +95,8 @@ class BrowserWrapperPool:
                                              session_id=create_session_id())
             await bw.set_browser_context(self.playwright,
                                                     self.proxy_info,
-                                                    self.run_without_proxy)            
+                                                    self.run_without_proxy,
+                                                    self.headless)            
             self.browser_wrapper_pool.append(bw)
 
     async def get_next_browser_context(self):
@@ -137,7 +141,8 @@ class BrowserWrapperPool:
             # I'ts time to punish this browser
             await new_browser_wrapper.set_browser_context(self.playwright, 
                                                     self.proxy_info, 
-                                                    self.run_without_proxy)
+                                                    self.run_without_proxy,
+                                                    self.headless)
 
             self.browser_wrapper_pool[browser_wrapper.index] = new_browser_wrapper
             await browser_wrapper.destroy()

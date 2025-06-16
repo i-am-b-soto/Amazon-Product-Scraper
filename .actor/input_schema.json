@@ -39,6 +39,12 @@
             "minimum": 1,
             "description": "Total number of browser context instances to store in memory (should not be lower than parallel worker count)"
         },
+        "headless":{
+            "title": "Run Headless",
+            "type": "boolean",
+            "default": true,
+            "description": "Run the scraper headless? Or would you like a head?"
+        },
         "request_timeout":{
             "title": "Global Request Timeout",
             "type": "integer",

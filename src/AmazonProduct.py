@@ -32,7 +32,7 @@ class AmazonProduct:
 
         return url        
 
-    def to_disct(self):
+    def to_dict(self):
         return {
                 "ASIN": self._ASIN,
                 "Title": self._title,
