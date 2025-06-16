@@ -7,16 +7,15 @@ from playwright.async_api import TimeoutError, Error as playwright_error
 
 from .request_handlers import handle_product_page, handle_list_page
 from .ProxyManager import ProxyManager
-from .BrowserWrapperPool import BrowserWrapperPool, BrowserWrapper
-from .browser_contexts import browser_contexts
+from .BrowserWrapperPool import BrowserWrapperPool
 from .custom_exceptions import ProductListPageNotLoaded, ProductNotLoaded
 
 
 
 SEMAPHORE_CONCURRENCY = 3
 NUM_BROWSERS = 4
-MAX_IDLE_CYCLES = 120
-REQUEST_TIMEOUT = 12000
+MAX_IDLE_CYCLES = 240
+REQUEST_TIMEOUT = 18000
 BANNED_DOMAINS = ["media-amazon.com", "ssl-images-amazon.com", 
                   "amazon-adsystem.com"]
 
@@ -44,26 +43,27 @@ async def process_request(queue, bwp, request, semaphore, add_human_behavior):
     """
     async with semaphore:
         bw = await bwp.get_next_browser_context()
-        await bw.enter_lock()
         context = bw.get_context() 
         page = await context.new_page()
 
         try:
             await page.route("**/*", block_images)          
-            await page.goto(request.url, wait_until="domcontentloaded", timeout=REQUEST_TIMEOUT)
+            await page.goto(request.url, wait_until="domcontentloaded", 
+                            timeout=20000)
             label = request.label
             if label == "LIST":
                 await handle_list_page(page, queue, add_human_behavior)
 
             elif label == "PRODUCT":
-                await handle_product_page(page, request.url, add_human_behavior)
+                await handle_product_page(page, request.url, 
+                                          add_human_behavior)
             
             await queue.mark_request_as_handled(request)
             Actor.log.info("✅ Successfully processed request: {}"
                         .format(request.url))
 
         except (TimeoutError, playwright_error, 
-                ProductListPageNotLoaded, ProductNotLoaded) as e: 
+                ProductListPageNotLoaded, ProductNotLoaded) as e:
             # Catch Timeout Errors
             retries = request.user_data.get("retries", 0)
             Actor.log.warning("Error on {} (attempt {}): {}"
@@ -73,15 +73,14 @@ async def process_request(queue, bwp, request, semaphore, add_human_behavior):
 
             if retries < 2:
                 request.user_data["retries"] = retries + 1
-                Actor.log.info("Retrying {} (retry {})"
-                            .format(request.url, retries + 1))
-                await asyncio.sleep(0.5)
                 await queue.reclaim_request(request, forefront=False)
             
             else:
                 await queue.mark_request_as_handled(request)
                 Actor.log.error("❌ Failed permanently: {} after {} attempts"
                                 .format(request.url, retries + 1))
+            #content = await page.content
+            #dataset.push({"example": content})
 
         except Exception as e:
             # All other errors will fall under here
@@ -91,7 +90,6 @@ async def process_request(queue, bwp, request, semaphore, add_human_behavior):
 
         finally:
             await page.close()
-            await bw.exit_lock()
 
 
 async def main():
@@ -119,12 +117,17 @@ async def main():
 
         semaphore = asyncio.Semaphore(semaphore_count)
 
+        # Save a named dataset to a variable
+        bad_html = await Actor.open_dataset(name='bad-html')
+
         if start_list_url is None:
             await Actor.fail("No product list url found")
 
+        """
         if browser_context_count < semaphore_count:
             await Actor.fail("Number of browser contexts should not be less " \
             "than number of parallel workers")
+        """
 
         r = Request.from_url(url=start_list_url, label="LIST")
         add_request_info = await queue.add_request(r)

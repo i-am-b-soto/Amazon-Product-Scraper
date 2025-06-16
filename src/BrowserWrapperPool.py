@@ -107,21 +107,10 @@ class BrowserWrapperPool:
         cur_cycle = 0
         cur_count = 0
 
-        while True:
-            if cur_count >= self.num_browsers:
-                cur_cycle += 1
-                if cur_cycle > max_cyles:
-                    raise Exception("Browser Pool waited too long for an open browser")
-                cur_count = 0
-                await asyncio.sleep(0.5)
-            
-            if self.browser_wrapper_pool[self.current_index % self.num_browsers].lock.locked():
-                self.current_index += 1
-                cur_count += 1
-            else:
-                bw = self.browser_wrapper_pool[self.current_index % self.num_browsers]
-                self.current_index += 1
-                return bw
+        bw = self.browser_wrapper_pool[self.current_index % self.num_browsers]
+        self.current_index += 1
+        return bw
+
 
     async def handle_no_response(self, browser_wrapper):
         """
@@ -133,7 +122,7 @@ class BrowserWrapperPool:
 
         failure_count = browser_wrapper.get_failure_count()
 
-        if failure_count >= 3:
+        if failure_count >= 1:
             
             new_browser_wrapper = BrowserWrapper(browser_wrapper.index,
                                                  create_session_id())

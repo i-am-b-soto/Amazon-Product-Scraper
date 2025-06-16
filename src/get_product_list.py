@@ -1,3 +1,5 @@
+import asyncio
+import random
 from bs4 import BeautifulSoup
 from .custom_exceptions import ProductListPageNotLoaded
 
@@ -100,14 +102,54 @@ def scrape_list_page(html):
     return urls_on_page
 
 
+async def is_valid_page(page, timeout: int = 4000) -> str:
+    try:
+        # Create two tasks to wait for either of the two conditions
+        list_item_task = asyncio.create_task(
+            page.wait_for_selector('div[role=\"listitem\"]', state='visible', timeout=timeout)
+        )
+        captcha_task = asyncio.create_task(
+            page.wait_for_selector('h4:text("Enter the characters you see below")', timeout=timeout)
+        )
+        error_img_task = asyncio.create_task(
+            page.wait_for_selector('img[alt="Sorry! Something went wrong on our end. Please go back and try again or go to Amazon\'s home page."]', timeout=timeout)
+        )        
+
+        done, pending = await asyncio.wait(
+            [list_item_task, captcha_task, error_img_task],
+            return_when=asyncio.FIRST_COMPLETED
+        )
+
+        # Cancel the task that didn't finish
+        for task in pending:
+            task.cancel()
+
+        # Determine which condition matched
+        if list_item_task in done:
+            return True
+        elif captcha_task in done:
+            return False
+        elif error_img_task in done:
+            return False
+
+    except TimeoutError:
+        return "timeout"
+
+
 async def get_product_urls(page):
     """
         Given a list of items, either from a search result or category, 
         return a list of all dem urls
     """
-
-    #await page.locator('div[role="list_item"]').wait_for(state="visible", 
-    #                                                     timeout=30000)
+    try:
+        if await is_valid_page(page):
+            #print("is valid")
+            pass
+        else:
+            await asyncio.sleep(random.uniform(2.4, 6.8))
+            raise ProductListPageNotLoaded("Blocked")
+    except Exception as e:
+        raise ProductListPageNotLoaded("Blocked by timeout")
 
     html = await page.content()
 

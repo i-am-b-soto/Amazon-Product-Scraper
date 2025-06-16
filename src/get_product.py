@@ -1,3 +1,5 @@
+import asyncio
+import random
 from bs4 import BeautifulSoup
 from .AmazonProduct import AmazonProduct
 from .custom_exceptions import ProductNotLoaded
@@ -80,22 +82,16 @@ def get_asin_regular(soup):
 
 def get_image_regular(soup):
     img_src = None
-    image_block = soup.find('div', {'id': 'altImages'})
+    image_block = soup.find_all('div', class_='imageThumbnail')
 
-    if image_block:
-        thumbnail_li = image_block.find_all('li', class_='imageThumbnail')
+    if image_block and len(image_block) > 0:
+        img_tag = image_block[0].find('img')
 
-        if thumbnail_li and len(thumbnail_li) > 0:
-            img_tag = thumbnail_li[0].find('img')
-            
-            if img_tag and img_tag.has_attr('src'):
-                img_src = img_tag['src']
-            else:
-                pass
+        if img_tag and img_tag.has_attr('src'):
+            img_src = img_tag['src']
         else:
             pass
-    else:
-        pass
+
     return img_src
 
 
@@ -169,13 +165,51 @@ def scrape_product(html, product_url):
     # Todo: Other types of product pages
 
 
+async def is_valid_page(page, timeout: int = 6000) -> str:
+ 
+    # Create two tasks to wait for either of the two conditions
+    product_page_task = asyncio.create_task(
+        page.locator("h1#title").wait_for(state="visible", timeout=timeout)
+    )
+    captcha_task = asyncio.create_task(
+        page.wait_for_selector('h4:text("Enter the characters you see below")', timeout=timeout)
+    )
+
+    error_img_task = asyncio.create_task(
+        page.wait_for_selector('img[alt="Sorry! Something went wrong on our end. Please go back and try again or go to Amazon\'s home page."]', timeout=timeout)
+    )        
+
+    done, pending = await asyncio.wait(
+        [product_page_task, captcha_task, error_img_task],
+        return_when=asyncio.FIRST_COMPLETED
+    )
+
+    # Cancel the task that didn't finish
+    for task in pending:
+        task.cancel()
+
+    # Determine which condition matched
+    if product_page_task in done:
+        return True
+    elif captcha_task in done:
+        return False
+    elif error_img_task in done:
+        return False
+
+
 async def get_product(page, product_url):
     """
         Given a list of items, either from a search result or category, return a representation of 
             an Amazon product. Or None if the page couldn't be accessed
     """
-    await page.locator("h1#title").wait_for(state="visible", 
-                                            timeout=3000)    
+    try:
+        if await is_valid_page(page):
+            pass
+        else:
+            await asyncio.sleep(random.uniform(1.2, 5.4))
+            raise ProductNotLoaded("Blocked")
+    except Exception as e:
+        raise ProductNotLoaded("Blocked by timeout")
 
     html = await page.content()
     

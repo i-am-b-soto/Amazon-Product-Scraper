@@ -26,7 +26,7 @@ async def human_scroll(
 
     for _ in range(max_scrolls):
         # Simulate random mouse movement across the screen
-        if use_mouse_movement and random.random() < 0.7:
+        if use_mouse_movement and random.random() < 0.7 and viewport_height > 0:
             try:
                 x = random.randint(0, viewport_height)
                 y = random.randint(0, viewport_height)
@@ -35,7 +35,7 @@ async def human_scroll(
                 pass  # Ignore failed mouse moves
 
         if random.random() < 0.2:
-            await human_sleep(1.5, 3.0)
+            await human_sleep(1.5, 3.5)
 
         scroll_by = random.randint(200, 600)
 
@@ -43,12 +43,12 @@ async def human_scroll(
             try:
                 await page.mouse.wheel(0, scroll_by)
             except Exception as e:
-                await page.evaluate(f"window.scrollBy(0, {scroll_by})")
+                await page.evaluate("window.scrollBy(0, {})".format(scroll_by))
         elif use_keyboard_scroll and random.random() < 0.5:
             await page.keyboard.press("PageDown")
             scroll_by = viewport_height
         else:
-            await page.evaluate(f"window.scrollBy(0, {scroll_by})")
+            await page.evaluate("window.scrollBy(0, {})".format(scroll_by))
 
         current_scroll += scroll_by
         await human_sleep(0.2, 0.8)
@@ -73,7 +73,7 @@ async def human_hover(
             pass
 
     # Hover behavior
-    if hover_count > 0 and visible_links:
+    if hover_count > 0 and visible_links and len(visible_links) > 1:
         link = random.choice(visible_links)
         box = await link.bounding_box()
         if box:
@@ -131,8 +131,11 @@ async def human_scroll_and_hover(
                 visible_links.append(link)
         except:
             pass
-
-    hover_count = random.randint(1, max_hovers)
+    
+    if max_hovers > 1:
+        hover_count = random.randint(1, max_hovers)
+    else:
+        hover_count = 0
 
     for _ in range(max_scrolls):
         # Random mouse movement
@@ -168,7 +171,7 @@ async def human_scroll_and_hover(
         await human_sleep(0.2, 0.8)
 
         # Hover behavior
-        if hover_count > 0 and visible_links:
+        if hover_count > 0 and visible_links and len(visible_links) > 1:
             link = random.choice(visible_links)
             box = await link.bounding_box()
             if box:
@@ -200,23 +203,23 @@ async def human_scroll_and_hover(
 
 
 async def perform_random_user_behavior(page):
-    num = random.randint(1,10)
+    num = random.randint(1, 10)
     if num == 1:
-        await human_scroll_and_hover(page)
+        await human_scroll_and_hover(page, 6)
     if num == 2:
-        await human_scroll(page)
+        await human_scroll(page, 4)
     if num == 3:
-        await human_scroll_and_hover(page, 3, True, False, True, 2)
+        await human_scroll_and_hover(page, 4, True, False, True, 2)
     if num == 4:
-        await human_scroll_and_hover(page, 6, False, False, True, 5)
+        await human_scroll_and_hover(page, 2, False, False, True, 5)
     if num == 5:
-        await human_sleep(1.3, 4.8)
+        await human_sleep(1.3, 2.8)
     if num == 6:
         await human_sleep(1.3, 2.1)
-        await human_hover(page)
+        await human_hover(page, 3)
     if num == 7:
-        await human_scroll_and_hover(page, 2, False, True, True, 1)
+        await human_scroll_and_hover(page, 2, False, True, True, 2)
     if num == 8:
         await human_hover(page, 2)
     else:
-        await human_sleep(2.3, 5.8)
+        await human_sleep(1, 2)
