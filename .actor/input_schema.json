@@ -27,7 +27,7 @@
         "parallel_worker_count": {
             "title": "Parallel Worker Count",
             "type": "integer",
-            "default": 5,
+            "default": 3,
             "minimum": 1,
             "description": "Maximum number of concurrent requests (higher numbers require more cpu)"
 
@@ -35,14 +35,14 @@
         "browser_context_count": {
             "title": "Browser Context Count",
             "type": "integer",
-            "default": 5,
+            "default": 3,
             "minimum": 1,
             "description": "Total number of browser context instances to store in memory (should not be lower than parallel worker count)"
         },
         "headless":{
             "title": "Run Headless",
             "type": "boolean",
-            "default": true,
+            "default": false,
             "description": "Run the scraper headless? Or would you like a head?"
         },
         "request_timeout":{

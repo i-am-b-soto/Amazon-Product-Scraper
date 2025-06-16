@@ -56,6 +56,50 @@ async def human_scroll(
         if current_scroll + 1000 > scroll_height:
             break
 
+async def human_hover(
+        page: Page,
+        hover_count = 5
+):
+    # Get visible links
+    links = await page.locator("a").element_handles()
+    visible_links = []
+    for link in links:
+        try:
+            box = await link.bounding_box()
+            href = await link.get_attribute("href")
+            if box is not None and href:
+                visible_links.append(link)
+        except:
+            pass
+
+    # Hover behavior
+    if hover_count > 0 and visible_links:
+        link = random.choice(visible_links)
+        box = await link.bounding_box()
+        if box:
+            try:
+                # Move near the link first
+                offset_x = box["x"] + random.randint(-30, 30)
+                offset_y = box["y"] + random.randint(-10, 10)
+                await page.mouse.move(offset_x, offset_y)
+                await human_sleep(0.1, 0.4)
+
+                # Hover directly
+                await page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+                await human_sleep(0.3, 2.0)
+
+                # Occasionally move away
+                if random.random() < 0.3:
+                    await page.mouse.move(
+                        offset_x + random.randint(50, 150),
+                        offset_y + random.randint(20, 60)
+                    )
+                    await human_sleep(0.1, 0.4)
+            except Exception as e:
+                pass
+            finally:
+                hover_count -= 1
+
 
 async def human_scroll_and_hover(
     page: Page,
@@ -161,3 +205,18 @@ async def perform_random_user_behavior(page):
         await human_scroll_and_hover(page)
     if num == 2:
         await human_scroll(page)
+    if num == 3:
+        await human_scroll_and_hover(page, 3, True, False, True, 2)
+    if num == 4:
+        await human_scroll_and_hover(page, 6, False, False, True, 5)
+    if num == 5:
+        await human_sleep(1.3, 4.8)
+    if num == 6:
+        await human_sleep(1.3, 2.1)
+        await human_hover(page)
+    if num == 7:
+        await human_scroll_and_hover(page, 2, False, True, True, 1)
+    if num == 8:
+        await human_hover(page, 2)
+    else:
+        await human_sleep(2.3, 5.8)
