@@ -50,8 +50,7 @@ async def process_request(queue, bwp, request, semaphore, add_human_behavior):
 
         try:
             await page.route("**/*", block_images)          
-            await page.goto(request.url, timeout=REQUEST_TIMEOUT,
-                            wait_until="domcontentloaded")
+            await page.goto(request.url, timeout=REQUEST_TIMEOUT)
             label = request.label
             if label == "LIST":
                 await handle_list_page(page, queue, add_human_behavior)

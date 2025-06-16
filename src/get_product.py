@@ -63,18 +63,93 @@ def get_title_regular(soup):
         raise Exception("Cannot find title")
         #print("No h1 title")
 
-    return title 
+    return title
+
+def get_asin_regular(soup):
+    asin = "N/A"
+    asin_input = soup.find('input', {'id': 'ASIN'})
+
+    if asin_input and asin_input.has_attr('value'):
+        asin = asin_input['value']
+    else:
+        pass
+        #print("ASIN not found.")
+
+    return asin
+
+
+def get_image_regular(soup):
+    img_src = None
+    image_block = soup.find('div', {'id': 'altImages'})
+
+    if image_block:
+        thumbnail_li = image_block.find_all('li', class_='imageThumbnail')
+
+        if thumbnail_li and len(thumbnail_li) > 0:
+            img_tag = thumbnail_li[0].find('img')
+            
+            if img_tag and img_tag.has_attr('src'):
+                img_src = img_tag['src']
+            else:
+                pass
+        else:
+            pass
+    else:
+        pass
+    return img_src
+
+
+def get_stars_regular(soup):
+    r = None
+    reviews_div = soup.find('div', class_='AverageCustomerReviews')
+    if reviews_div:
+        rating_span = reviews_div.find('span', class_='a-icon-alt')
+        if rating_span:
+            rating_text = rating_span.get_text(strip=True)
+            if rating_text:
+                r = rating_text.split(' ')[0]
+        else:
+            pass
+    else:
+        pass
+
+    return r
+
+
+def get_review_count_regular(soup):
+    r = None
+    review_count_span = soup.find('span', attrs={'data-hook': 'total-review-count'})
+
+    if review_count_span:
+        total_reviews = review_count_span.get_text(strip=True)
+        if total_reviews:
+            r = total_reviews.strip().split(' ')[0]
+    else:
+        pass
+
+    return r      
 
 
 def scrape_regular_product(soup, product_url):
     """
         Scrape a product from a 'regular' Amazon page. Return the goodies
     """
+    asin = get_asin_regular(soup)
     title = get_title_regular(soup)
+    image = get_image_regular(soup)
     price = get_price_regular(soup)
+    stars = get_stars_regular(soup)
+    review_count = get_review_count_regular(soup)
     description = get_description_regular(soup)
 
-    p = AmazonProduct(title=title, price=price, description=description, 
+
+    p = AmazonProduct(ASIN=asin, 
+                      image=image, 
+                      title=title, 
+                      price=price,
+                      stars=stars,
+                      review_count=review_count,
+                      description=description, 
                       url=product_url)
 
     return p

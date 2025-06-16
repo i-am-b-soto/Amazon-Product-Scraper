@@ -11,7 +11,7 @@ async def handle_product_page(page, product_url, add_human_behavior=False):
         Handle a product page request
     """
     product = await get_product(page, product_url)
-    await Actor.push_data(product.to_json())
+    await Actor.push_data(product.to_dict())
 
     if add_human_behavior:
         await perform_random_user_behavior(page)
