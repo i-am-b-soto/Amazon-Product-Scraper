@@ -24,4 +24,4 @@ class ProxyManager:
             "server": f"{parsed.scheme}://{parsed.hostname}:{parsed.port}",
             "username": parsed.username,
             "password": parsed.password,
-        }
+        } 

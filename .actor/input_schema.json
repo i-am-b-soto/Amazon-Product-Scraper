@@ -8,47 +8,27 @@
             "type": "string",
             "description": "Enter the URL of the Amazon Product List Page you want to start scraping",
             "editor": "textfield",
-            "prefill": "https://www.amazon.com/s?k=speakers&_encoding=UTF8"
+            "prefill": "https://www.amazon.com/s?k=health+and+beauty&i=beauty-intl-ship&_encoding=UTF8"
         },
 
         "use_resedential_proxies": {
             "title": "Use Resedential Proxies?",
             "type": "boolean",
             "description": "Use Resedential Proxies to perform this scrape? Decreases risk for bot detection but potentially increases cost.",
-            "default": true
-        },
-        "add_human_behavior": {
-            "title": "Add human-like behavior to requests made?",
-            "type": "boolean",
-            "description": "Add human-like behavior to requests made. Decreases risk for bot detection but risks the program running slower.",
-            "default": true
-
+            "default": false
         },
         "parallel_worker_count": {
             "title": "Parallel Worker Count",
             "type": "integer",
-            "default": 16,
-            "minimum": 1,
+            "default": 11,
+            "minimum": 11,
             "description": "Maximum number of concurrent requests (higher numbers require more cpu)"
 
-        },
-        "browser_context_count": {
-            "title": "Browser Context Count",
-            "type": "integer",
-            "default": 4,
-            "minimum": 1,
-            "description": "Total number of browser context instances to store in memory (should not be lower than parallel worker count)"
-        },
-        "headless":{
-            "title": "Run Headless",
-            "type": "boolean",
-            "default": true,
-            "description": "Run the scraper headless? Or would you like a head?"
         },
         "request_timeout":{
             "title": "Global Request Timeout",
             "type": "integer",
-            "default": 18000,
+            "default": 6000,
             "minimum": 3000,
             "description": "Time in ms to wait for each request before failing."
         }

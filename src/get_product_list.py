@@ -10,12 +10,12 @@ def get_next_page_url(html):
     """
     soup = BeautifulSoup(html, "html.parser")
     pagination_strip = soup.find("span", class_="s-pagination-strip")
-    next_page_url = "https:/www.amazon.com"
+    next_page_url = "https://www.amazon.com"
     if pagination_strip:
         next_button = pagination_strip.find("a", class_="s-pagination-next")
         if next_button and 'href' in next_button.attrs:
             next_page_url += next_button["href"]
-    if next_page_url == "https:/www.amazon.com":
+    if next_page_url == "https://www.amazon.com":
         return None
     return next_page_url
 
@@ -136,22 +136,13 @@ async def is_valid_page(page, timeout: int = 4000) -> str:
         return "timeout"
 
 
-async def get_product_urls(page):
+async def get_product_urls(response):
     """
         Given a list of items, either from a search result or category, 
         return a list of all dem urls
     """
-    try:
-        if await is_valid_page(page):
-            #print("is valid")
-            pass
-        else:
-            await asyncio.sleep(random.uniform(2.4, 6.8))
-            raise ProductListPageNotLoaded("Blocked")
-    except Exception as e:
-        raise ProductListPageNotLoaded("Blocked by timeout")
 
-    html = await page.content()
+    html = response.text
 
     product_urls = scrape_list_page(html)
     #print("I got the product urls!")

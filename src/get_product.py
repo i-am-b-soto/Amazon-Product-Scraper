@@ -82,7 +82,7 @@ def get_asin_regular(soup):
 
 def get_image_regular(soup):
     img_src = None
-    image_block = soup.find_all('div', class_='imageThumbnail')
+    image_block = soup.find_all('div', class_='imgTagWrapper')
 
     if image_block and len(image_block) > 0:
         img_tag = image_block[0].find('img')
@@ -197,21 +197,13 @@ async def is_valid_page(page, timeout: int = 6000) -> str:
         return False
 
 
-async def get_product(page, product_url):
+async def get_product(response, product_url):
     """
         Given a list of items, either from a search result or category, return a representation of 
             an Amazon product. Or None if the page couldn't be accessed
     """
-    try:
-        if await is_valid_page(page):
-            pass
-        else:
-            await asyncio.sleep(random.uniform(1.2, 5.4))
-            raise ProductNotLoaded("Blocked")
-    except Exception as e:
-        raise ProductNotLoaded("Blocked by timeout")
 
-    html = await page.content()
+    html = response.text
     
     p = scrape_product(html, product_url)
 
@@ -220,6 +212,3 @@ async def get_product(page, product_url):
 
 if __name__ == "__main__":
     pass
-
-    #print(list_of_product_urls)
-    
