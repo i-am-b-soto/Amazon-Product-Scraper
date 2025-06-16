@@ -104,7 +104,7 @@ async def process_request(queue, request_info, sm, semaphore):
             Actor.log.warning("Timeout for url {} (attempt {}): {}\n"
                             .format(request_info.url, retries + 1, e))
             
-            sm.handle_failure()
+            await sm.handle_failure()
 
             if retries < 2:
                 request_info.user_data["retries"] = retries + 1
