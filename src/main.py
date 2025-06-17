@@ -54,8 +54,8 @@ class SessionManager:
 
     async def handle_failure(self):
         async with self._lock:
-            self._failure += 1
-            if self._failure > 3:
+            self._failure_count += 1
+            if self._failure_count > 5:
                 self._session_id = SessionManager.get_new_session_id()
                 await self.set_new_proxy_url()
 
@@ -205,7 +205,12 @@ async def main():
             if CURRENT_ITEM_COUNT >= max_number_of_products:
                 break
 
+        Actor.log.info("Finishing up some things :) ")
         # Wait for any remaining tasks
         if tasks:
             await asyncio.gather(*tasks)
+        
+        Actor.log.info("All Done! 💜")
+        
+
             

@@ -14,7 +14,7 @@
             "title": "Maximum number of products to scrape",
             "type": "integer",
             "description": "Enter the maximum number of products to scrape",
-            "default": 250 
+            "default": 50 
         }
 
 
