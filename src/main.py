@@ -20,29 +20,44 @@ REQUEST_TIMEOUT = 6000
 BANNED_DOMAINS = ["media-amazon.com", "ssl-images-amazon.com", 
                   "amazon-adsystem.com"]
 
+CURRENT_ITEM_COUNT = 0
+
+GLOBAL_LOCK = asyncio.Lock()
+
+
+async def update_current_item_count():
+    async with GLOBAL_LOCK:
+        global CURRENT_ITEM_COUNT
+        CURRENT_ITEM_COUNT += 1
 
 
 class SessionManager:
     def __init__(self, proxy_info):
         self._proxy_info = proxy_info
         self._failure_count = 0
-        self._session_id=SessionManager.get_new_session_id()
-
+        self._needs_updating = True
+        self._cur_proxy = None 
+        self._session_id = SessionManager.get_new_session_id()
+        self._lock = asyncio.Lock()
 
     @staticmethod
     def get_new_session_id():
         return "session_{}".format(uuid.uuid4().hex)
 
+    async def set_new_proxy_url(self):
+        self._cur_proxy = await self._proxy_info.new_url(session_id=self._session_id)
 
     async def get_proxy_url(self):
-        url = await self._proxy_info.new_url(session_id=self._session_id)
-        return url
-    
+        if self._cur_proxy is None:
+            await self.set_new_proxy_url()
+        return self._cur_proxy
 
     async def handle_failure(self):
-        self._failure += 1
-        if self._failure > 3:
-            self._session_id=SessionManager.get_new_session_id()
+        async with self._lock:
+            self._failure += 1
+            if self._failure > 3:
+                self._session_id = SessionManager.get_new_session_id()
+                await self.set_new_proxy_url()
 
 
 
@@ -78,12 +93,12 @@ async def process_request(queue, request_info, sm, semaphore):
     async with semaphore:
         #proxy_url = await pm.get_proxy_url()
         try:
-            start_time = time.time()
+            #start_time = time.time()
             proxy_url = await sm.get_proxy_url()
             response = await make_request(request_info.url, proxy_url, 
                                           request_info.user_data.get("referer", None))
-            end_time = time.time()
-            print("Request took {}s".format(end_time - start_time))
+            #end_time = time.time()
+            #print("Request took {}s".format(end_time - start_time))
 
             label = request_info.label
             if label == "LIST":
@@ -91,6 +106,7 @@ async def process_request(queue, request_info, sm, semaphore):
 
             elif label == "PRODUCT":
                 await handle_product_page(response, request_info.url)
+                await update_current_item_count()
             
             await queue.mark_request_as_handled(request_info)
             Actor.log.info("✅ Successfully processed request: {}"
@@ -145,6 +161,8 @@ async def main():
 
         semaphore = asyncio.Semaphore(semaphore_count)
 
+        max_number_of_products = actor_input.get('max_products_to_scrape')
+
         if start_list_url is None:
             await Actor.fail("No product list url found")
 
@@ -182,6 +200,10 @@ async def main():
                                 semaphore)
             )
             tasks.append(task)
+
+            global CURRENT_ITEM_COUNT
+            if CURRENT_ITEM_COUNT >= max_number_of_products:
+                break
 
         # Wait for any remaining tasks
         if tasks:

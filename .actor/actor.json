@@ -1,9 +1,9 @@
 {
 	"actorSpecification": 1,
-	"name": "amazon-product-scraper",
-	"title": "Refined Amazon Product Scraper",
+	"name": "FireAmazonProductScraper",
+	"title": "🔥 Amazon Product Scraper",
 	"description": "More Robust-ness in scraping US Amazon Product Pages",
-	"version": "0.0",
+	"version": "1.1",
 	"buildTag": "latest",
 	"meta": {
 		"templateId": "python-start"

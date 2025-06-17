@@ -6,32 +6,18 @@
         "product_list_url": {
             "title": "Product list URL to start",
             "type": "string",
-            "description": "Enter the URL of the Amazon Product List Page you want to start scraping",
+            "description": "Enter the URL of the Amazon Product List Page you want to start scraping. Currently only the US based Amazon is supported.",
             "editor": "textfield",
             "prefill": "https://www.amazon.com/s?k=health+and+beauty&i=beauty-intl-ship&_encoding=UTF8"
         },
-
-        "use_resedential_proxies": {
-            "title": "Use Resedential Proxies?",
-            "type": "boolean",
-            "description": "Use Resedential Proxies to perform this scrape? Decreases risk for bot detection but potentially increases cost.",
-            "default": false
-        },
-        "parallel_worker_count": {
-            "title": "Parallel Worker Count",
+        "max_products_to_scrape": {
+            "title": "Maximum number of products to scrape",
             "type": "integer",
-            "default": 11,
-            "minimum": 11,
-            "description": "Maximum number of concurrent requests (higher numbers require more cpu)"
-
-        },
-        "request_timeout":{
-            "title": "Global Request Timeout",
-            "type": "integer",
-            "default": 6000,
-            "minimum": 3000,
-            "description": "Time in ms to wait for each request before failing."
+            "description": "Enter the maximum number of products to scrape",
+            "default": 250 
         }
+
+
     },  
     "required":["product_list_url"]
 }

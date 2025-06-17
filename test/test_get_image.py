@@ -2,6 +2,26 @@ from bs4 import BeautifulSoup
 import httpx
 import asyncio
 
+
+async def get_breadcrumbs():
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/114.0.0.0 Safari/537.36"
+        ),
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://www.google.com/",
+    }
+    url = "https://www.amazon.com/Zwilling-Enfingy-Electric-Programs-Cordless/dp/B08NCJ5W4P/ref=sr_1_21?_encoding=UTF8&sr=8-21"
+
+    async with httpx.AsyncClient(headers=headers, follow_redirects=True) as client:
+        response = await client.get(url)
+    html = response.text
+
+    
+
+
 async def run():
     headers = {
         "User-Agent": (
