@@ -1,7 +1,7 @@
+import asyncio
 import random
 from bs4 import BeautifulSoup
-from .selenium_behavior import wait_for_list_page_load, human_action
-from .project_globals import FIRST_LIST_PAGE_LOADED
+from .custom_exceptions import ProductListPageNotLoaded
 
 
 def get_next_page_url(html):
@@ -10,22 +10,27 @@ def get_next_page_url(html):
     """
     soup = BeautifulSoup(html, "html.parser")
     pagination_strip = soup.find("span", class_="s-pagination-strip")
-    next_page_url = "https:/www.amazon.com"
+    next_page_url = "https://www.amazon.com"
     if pagination_strip:
         next_button = pagination_strip.find("a", class_="s-pagination-next")
         if next_button and 'href' in next_button.attrs:
             next_page_url += next_button["href"]
-    if next_page_url == "https:/www.amazon.com":
+    if next_page_url == "https://www.amazon.com":
         return None
     return next_page_url
 
 
 def what_type_of_list(soup):
     """
-        Determine what type of list the product list page is (currently identified 2 types - Grid and row)
+        Determine what type of list the product list page is (currently 
+        identified 2 types - Grid and row)
     """
     list_items = soup.find_all("div", attrs={"role": "listitem"})
-    li = list_items[0]
+
+    if len(list_items) > 0:
+        li = list_items[0]
+    else:
+        raise ProductListPageNotLoaded("Can't determine type of product list page") 
 
     if li.find("div", class_="puis-card-container"):
         return "rows"
@@ -40,14 +45,12 @@ def scrape_rows(soup):
     list_items = soup.find_all("div", attrs={"role": "listitem"})
 
     links = []
-
+    #print("found list items")
     for div in list_items:
         card_container = div.find("div", class_="puis-card-container")
         if div.find("span", string="sponsored") is not None:
-           
             continue
         if card_container:
-
             a_tag = card_container.find("a", class_="a-link-normal")
             if a_tag and 'href' in a_tag.attrs:
                 link_string = a_tag['href']
@@ -86,8 +89,9 @@ def scrape_grid(soup):
 
 def scrape_list_page(html):
     soup = BeautifulSoup(html, "html.parser")
+    #print(soup)
     page_type = what_type_of_list(soup)
-
+    #print("We have the page_type: {}".format(page_type))
     urls_on_page = []
 
     if page_type == "grid":
@@ -98,53 +102,54 @@ def scrape_list_page(html):
     return urls_on_page
 
 
-def get_product_urls(list_url, driver):
-    """
-        Given a list of items, either from a search result or category, return a list of all dem urls
-    """
-
+async def is_valid_page(page, timeout: int = 4000) -> str:
     try:
-        driver.get(list_url)
-        wait_for_list_page_load(driver)
-    except Exception as e:
-        print("There was an issue aquiriing the Amazon list url {}: {}"
-              .format(list_url, e))
-        raise StopIteration
-    
-    html = driver.page_source
+        # Create two tasks to wait for either of the two conditions
+        list_item_task = asyncio.create_task(
+            page.wait_for_selector('div[role=\"listitem\"]', state='visible', timeout=timeout)
+        )
+        captcha_task = asyncio.create_task(
+            page.wait_for_selector('h4:text("Enter the characters you see below")', timeout=timeout)
+        )
+        error_img_task = asyncio.create_task(
+            page.wait_for_selector('img[alt="Sorry! Something went wrong on our end. Please go back and try again or go to Amazon\'s home page."]', timeout=timeout)
+        )        
 
-    #with open("super-quick-test-1.html", "w") as f:
-    #    f.write(html)
+        done, pending = await asyncio.wait(
+            [list_item_task, captcha_task, error_img_task],
+            return_when=asyncio.FIRST_COMPLETED
+        )
 
-    total_urls = scrape_list_page(html)
-    FIRST_LIST_PAGE_LOADED.set()
+        # Cancel the task that didn't finish
+        for task in pending:
+            task.cancel()
+
+        # Determine which condition matched
+        if list_item_task in done:
+            return True
+        elif captcha_task in done:
+            return False
+        elif error_img_task in done:
+            return False
+
+    except TimeoutError:
+        return "timeout"
+
+
+async def get_product_urls(response):
+    """
+        Given a list of items, either from a search result or category, 
+        return a list of all dem urls
+    """
+
+    html = response.text
+
+    product_urls = scrape_list_page(html)
+    #print("I got the product urls!")
     next_page_url = get_next_page_url(html)
-    current_page = 1
-    
-    for url in total_urls:
-        yield url
 
-    while next_page_url is not None:
-        current_page += 1
-        
-        try:
-            driver.get(next_page_url)
-            wait_for_list_page_load(driver)
-        except Exception as e:
-            print("There was an issue aquiriing the Amazon list url{}: {}"
-                .format(next_page_url, e))
-            raise StopIteration
-
-        html = driver.page_source
-        total_urls = scrape_list_page(html)
-        next_page_url = get_next_page_url(html)
-
-        human_action(driver, random.randint(0, 8))
-
-        for url in total_urls:
-            yield url
+    return (product_urls, next_page_url)
 
 
 if __name__ == "__main__":
     pass
-    

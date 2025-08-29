@@ -1,7 +1,7 @@
 # First, specify the base Docker image.
 # You can see the Docker images from Apify at https://hub.docker.com/r/apify/.
 # You can also use any other image from Docker Hub.
-FROM apify/actor-python-selenium:3.13
+FROM apify/actor-python:3.13
 
 # Second, copy just requirements.txt into the Actor image,
 # since it should be the only file that affects the dependency install in the next step,
@@ -27,6 +27,11 @@ COPY . ./
 
 # Use compileall to ensure the runnability of the Actor Python code.
 RUN python3 -m compileall -q src/
+
+# Create and run as a non-root user.
+RUN useradd --create-home apify && \
+    chown -R apify:apify ./
+USER apify
 
 # Specify how to launch the source code of your Actor.
 # By default, the "python3 -m src" command is run
